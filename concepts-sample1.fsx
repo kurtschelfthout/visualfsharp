@@ -11,7 +11,7 @@ type MergeTrait<'T> =
 
 // mergeTwice<'T,'U  when 'U :> MergeTrait<'T>>  : 'T -> 'T
 
-let trait<'T> = Unchecked.defaultof<'T>
+//let trait<'T> = Unchecked.defaultof<'T>
 
 // 6. Make type parameters implicit by automatically generalizing 'U here
 
