@@ -4304,7 +4304,7 @@ namespace Microsoft.FSharp.Core
 
 
         [<CompiledName("Trait")>]
-        let inline trait<'T when 'T : struct> = unsafeDefault<'T>
+        let inline trait<'T (*when 'T : struct*)> = unsafeDefault<'T>
 
         [<CompiledName("Infinity")>]
         let infinity     = System.Double.PositiveInfinity

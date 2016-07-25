@@ -2671,7 +2671,7 @@ namespace Microsoft.FSharp.Core
         /// <summary>Access a trait.</summary>
         [<RequiresExplicitTypeArguments>] 
         [<CompiledName("Trait")>]
-        val inline trait<'T when 'T : struct> : 'T
+        val inline trait<'T (*when 'T : struct*)> : 'T
 
 
 #if MULTI_DIMENSIONAL_EXTENSION_PROPERTIES
