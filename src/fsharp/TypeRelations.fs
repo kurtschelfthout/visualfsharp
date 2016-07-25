@@ -132,12 +132,48 @@ let rec TypeFeasiblySubsumesType ndeep g amap m ty1 canCoerce ty2 =
              |> List.exists (TypeFeasiblySubsumesType (ndeep+1) g amap m ty1 NoCoerce))
                    
 
+
+type WitnessEnv = 
+     | NoWitnessEnv  
+     | WitnessEnv  of NameResolutionEnv
+
+
+
+let FindWitness g amap m (wenv: WitnessEnv) (traitTy: TType) =
+
+    match wenv with 
+    | NoWitnessEnv -> failwith "no witness environment :("
+    | WitnessEnv nenv ->  
+
+         let possibilities = 
+            nenv.eTyconsByAccessNames.Values
+            |> Seq.choose (fun tcref -> 
+
+                 if TyconRefHasAttribute g m g.attrib_WitnessAttribute tcref &&
+                    tcref.IsStructOrEnumTycon &&
+                    tcref.TyparsNoRange.Length = 0 &&
+                    TypeFeasiblySubsumesType 0 g amap m traitTy CanCoerce (mkAppTy tcref [])
+
+                    then Some (mkAppTy tcref [])
+
+                    else None)
+            |> Seq.toList
+
+         match possibilities with 
+         | [sln] -> sln
+         | [] -> failwith (sprintf "no solution to trait %s" (NicePrint.stringOfTy (DisplayEnv.Empty g) traitTy))
+         | sln :: _ -> 
+             printfn "too many solutions for trait %s" (NicePrint.stringOfTy (DisplayEnv.Empty g) traitTy)
+             sln
+
+
+
 /// Choose solutions for Expr.TyChoose type "hidden" variables introduced
 /// by letrec nodes. Also used by the pattern match compiler to choose type
 /// variables when compiling patterns at generalized bindings.
 ///     e.g. let ([],x) = ([],[])
 /// Here x gets a generalized type "list<'T>".
-let ChooseTyparSolutionAndRange (g: TcGlobals) amap (tp:Typar) =
+let ChooseTyparSolutionAndRange g amap (wenv: WitnessEnv) (tp:Typar) =
     let m = tp.Range
     let max,m = 
          let initial = 
@@ -146,15 +182,28 @@ let ChooseTyparSolutionAndRange (g: TcGlobals) amap (tp:Typar) =
              | TyparKind.Measure -> TType_measure Measure.One
          // Loop through the constraints computing the lub
          ((initial,m), tp.Constraints) ||> List.fold (fun (maxSoFar,_) tpc -> 
+
+
              let join m x = 
                  if TypeFeasiblySubsumesType 0 g amap m x CanCoerce maxSoFar then maxSoFar
                  elif TypeFeasiblySubsumesType 0 g amap m maxSoFar CanCoerce x then x
                  else errorR(Error(FSComp.SR.typrelCannotResolveImplicitGenericInstantiation((DebugPrint.showType x), (DebugPrint.showType maxSoFar)),m)); maxSoFar
+
              // Don't continue if an error occurred and we set the value eagerly 
              if tp.IsSolved then maxSoFar,m else
              match tpc with 
              | TyparConstraint.CoercesTo(x,m) -> 
-                 join m x,m
+                 
+                 if isAppTy g x &&  TyconRefHasAttribute g m g.attrib_TraitAttribute (tcrefOfAppTy g x ) then
+
+                    // Traits can't act as solutions, instead we need to find an instance
+                    // of the trait to act as a solution.  So go search for one.
+                    let sln = FindWitness g amap m wenv x
+                    join m sln,m
+
+                 else 
+                    join m x,m
+
              | TyparConstraint.MayResolveMember(TTrait(_,nm,_,_,_,_),m) -> 
                  errorR(Error(FSComp.SR.typrelCannotResolveAmbiguityInOverloadedOperator(DemangleOperatorName nm),m))
                  maxSoFar,m
@@ -186,8 +235,8 @@ let ChooseTyparSolutionAndRange (g: TcGlobals) amap (tp:Typar) =
                  maxSoFar,m)
     max,m
 
-let ChooseTyparSolution g amap tp = 
-    let ty,_m = ChooseTyparSolutionAndRange g amap tp
+let ChooseTyparSolution g amap nenv tp = 
+    let ty,_m = ChooseTyparSolutionAndRange g amap nenv tp
     if tp.Rigidity = TyparRigidity.Anon && typeEquiv g ty (TType_measure Measure.One) then
         warning(Error(FSComp.SR.csCodeLessGeneric(),tp.Range))
     ty
@@ -226,7 +275,7 @@ let ChooseTyparSolutionsForFreeChoiceTypars g amap e =
         let ftvs = (freeInExpr CollectTyparsNoCaching e1).FreeTyvars.FreeTypars
         let tps = tps |> List.filter (Zset.memberOf ftvs)
         
-        let solutions =  tps |> List.map (ChooseTyparSolution g amap) |> IterativelySubstituteTyparSolutions g tps
+        let solutions =  tps |> List.map (ChooseTyparSolution g amap NoWitnessEnv) |> IterativelySubstituteTyparSolutions g tps
         
         let tpenv = mkTyparInst tps solutions
         

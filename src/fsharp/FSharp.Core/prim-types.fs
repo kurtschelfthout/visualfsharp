@@ -172,6 +172,16 @@ namespace Microsoft.FSharp.Core
     type EntryPointAttribute() = 
         inherit System.Attribute()
 
+    [<AttributeUsage (AttributeTargets.Interface,AllowMultiple=false)>]  
+    [<Sealed>]
+    type TraitAttribute() = 
+        inherit System.Attribute()
+
+    [<AttributeUsage (AttributeTargets.Class ||| AttributeTargets.Struct,AllowMultiple=false)>]  
+    [<Sealed>]
+    type WitnessAttribute() = 
+        inherit System.Attribute()
+
     [<AttributeUsage (AttributeTargets.Class,AllowMultiple=false)>]  
     [<Sealed>]
     type ReferenceEqualityAttribute() = 

@@ -319,6 +319,20 @@ namespace Microsoft.FSharp.Core
         /// <returns>EntryPointAttribute</returns>
         new : unit -> EntryPointAttribute
 
+    /// <summary>TBD</summary>
+    [<AttributeUsage (AttributeTargets.Interface,AllowMultiple=false)>]  
+    [<Sealed>]
+    type TraitAttribute =
+        inherit System.Attribute
+        new : unit -> TraitAttribute
+
+    /// <summary>TBD</summary>
+    [<AttributeUsage (AttributeTargets.Class ||| AttributeTargets.Struct,AllowMultiple=false)>]  
+    [<Sealed>]
+    type WitnessAttribute =
+        inherit System.Attribute
+        new : unit -> WitnessAttribute
+
     /// <summary>Adding this attribute to a record or union type disables the automatic generation
     /// of overrides for 'System.Object.Equals(obj)', 'System.Object.GetHashCode()' 
     /// and 'System.IComparable' for the type. The type will by default use reference equality.</summary>

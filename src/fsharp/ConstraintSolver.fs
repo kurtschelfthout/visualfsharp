@@ -2677,10 +2677,10 @@ let CodegenWitnessThatTypSupportsTraitConstraint tcVal g amap m (traitInfo:Trait
         | Choice4Of4 () -> ResultD None)
 
 
-let ChooseTyparSolutionAndSolve css denv tp =
+let ChooseTyparSolutionAndSolve css nenv denv tp =
     let g = css.g
     let amap = css.amap
-    let max,m = ChooseTyparSolutionAndRange g amap tp 
+    let max,m = ChooseTyparSolutionAndRange g amap nenv tp 
     let csenv = MakeConstraintSolverEnv ContextInfo.NoContext css m denv
     TryD (fun () -> SolveTyparEqualsTyp csenv 0 m NoTrace (mkTyparTy tp) max)
          (fun err -> ErrorD(ErrorFromApplyingDefault(g,denv,tp,max,err,m)))

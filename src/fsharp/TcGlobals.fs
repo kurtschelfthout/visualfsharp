@@ -676,6 +676,7 @@ type public TcGlobals(compilingFslib: bool, ilg:ILGlobals, fslibCcu: CcuThunk, d
   let addFieldNeverAttrs (fdef:ILFieldDef) = {fdef with CustomAttrs = addNeverAttrs fdef.CustomAttrs}
   let mkDebuggerTypeProxyAttribute (ty : ILType) = mkILCustomAttribute ilg (findSysILTypeRef tname_DebuggerTypeProxyAttribute,  [ilg.typ_Type], [ILAttribElem.TypeRef (Some ty.TypeRef)], [])
 
+
     // Build a map that uses the "canonical" F# type names and TyconRef's for these
     // in preference to the .NET type names. Doing this normalization is a fairly performance critical
     // piece of code as it is frequently invoked in the process of converting .NET metadata to F# internal
@@ -1012,6 +1013,8 @@ type public TcGlobals(compilingFslib: bool, ilg:ILGlobals, fslibCcu: CcuThunk, d
   member val attrib_AutoSerializableAttribute              = mk_MFCore_attrib "AutoSerializableAttribute"
   member val attrib_RequireQualifiedAccessAttribute        = mk_MFCore_attrib "RequireQualifiedAccessAttribute"
   member val attrib_EntryPointAttribute                    = mk_MFCore_attrib "EntryPointAttribute"
+  member val attrib_WitnessAttribute                       = mk_MFCore_attrib "WitnessAttribute"
+  member val attrib_TraitAttribute                         = mk_MFCore_attrib "TraitAttribute"
   member val attrib_DefaultAugmentationAttribute           = mk_MFCore_attrib "DefaultAugmentationAttribute"
   member val attrib_CompilerMessageAttribute               = mk_MFCore_attrib "CompilerMessageAttribute"
   member val attrib_ExperimentalAttribute                  = mk_MFCore_attrib "ExperimentalAttribute"

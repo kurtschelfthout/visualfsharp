@@ -112,7 +112,7 @@ let BindSubExprOfInput g amap gtps (PBind(v,tyscheme)) m (SubExpr(accessf,(ve2,v
                          mkTyparTy gtp 
                      else 
                          someSolved := true
-                         TypeRelations.ChooseTyparSolution g amap gtp
+                         TypeRelations.ChooseTyparSolution g amap NoWitnessEnv gtp
 
                 let solutions = List.map freezeVar gtps
                 if !someSolved then 
