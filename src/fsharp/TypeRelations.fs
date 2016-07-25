@@ -225,6 +225,8 @@ let ChooseTyparSolutionAndRange g amap (wenv: WitnessEnv) (tp:Typar) =
                  join m g.mk_IComparable_ty,m
              | TyparConstraint.SupportsEquality m -> 
                  maxSoFar,m
+             | TyparConstraint.Associated _ -> 
+                 maxSoFar,m
              | TyparConstraint.IsEnum(_,m) -> 
                  errorR(Error(FSComp.SR.typrelCannotResolveAmbiguityInEnum(),m))
                  maxSoFar,m

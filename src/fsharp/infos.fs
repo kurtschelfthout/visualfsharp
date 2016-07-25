@@ -202,6 +202,7 @@ let private FoldHierarchyOfTypeAux followInterfaces allowMultiIntfInst skipUnref
                           | TyparConstraint.IsUnmanaged _ 
                           | TyparConstraint.IsReferenceType _ 
                           | TyparConstraint.SimpleChoice _ 
+                          | TyparConstraint.Associated _ 
                           | TyparConstraint.RequiresDefaultConstructor _ -> vacc
                           | TyparConstraint.CoercesTo(cty,_) -> 
                                   loop (ndeep + 1)  cty vacc) 
@@ -305,6 +306,8 @@ let CopyTyparConstraints m tprefInst (tporig:Typar) =
            match tpc with 
            | TyparConstraint.CoercesTo(ty,_) -> 
                TyparConstraint.CoercesTo (instType tprefInst ty,m)
+           | TyparConstraint.Associated(ty,_) -> 
+               TyparConstraint.Associated (instType tprefInst ty,m)
            | TyparConstraint.DefaultsTo(priority,ty,_) -> 
                TyparConstraint.DefaultsTo (priority,instType tprefInst ty,m)
            | TyparConstraint.SupportsNull _ -> 

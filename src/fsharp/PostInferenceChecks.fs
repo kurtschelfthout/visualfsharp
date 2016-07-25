@@ -257,6 +257,7 @@ and CheckTypesDeep f g env tys = List.iter (CheckTypeDeep f g env) tys
 and CheckTypeConstraintDeep f g env x =
      match x with 
      | TyparConstraint.CoercesTo(ty,_) -> CheckTypeDeep f g env ty
+     | TyparConstraint.Associated(ty,_) -> CheckTypeDeep f g env ty
      | TyparConstraint.MayResolveMember(traitInfo,_) -> CheckTraitInfoDeep f g env traitInfo
      | TyparConstraint.DefaultsTo(_,ty,_) -> CheckTypeDeep f g env ty
      | TyparConstraint.SimpleChoice(tys,_) -> CheckTypesDeep f g env tys

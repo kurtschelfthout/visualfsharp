@@ -15,8 +15,8 @@ type MergeTrait<'T> =
 
 // 6. Make type parameters implicit by automatically generalizing 'U here
 
-//let mergeTwice  (x: 'T when 'U :> MergeTrait<'T>) =       
-let mergeTwice<'T, 'U when 'U :> MergeTrait<'T>>(x : 'T ) =       
+let mergeTwice  (x: 'T when 'U :> MergeTrait<'T>) =       
+//let mergeTwice<'T, 'U when 'U :> MergeTrait<'T>>(x : 'T ) =       
     let x0 = trait<'U>.Empty   
     let x2 = trait<'U>.Merge(x,x0)   
     let x4 = trait<'U>.Merge(x2,x2)   

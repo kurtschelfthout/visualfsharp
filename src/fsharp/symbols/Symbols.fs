@@ -1069,6 +1069,16 @@ and FSharpGenericParameterConstraint(cenv, cx : TyparConstraint) =
         | TyparConstraint.CoercesTo(ty,_) -> FSharpType(cenv,  ty) 
         | _ -> invalidOp "not a coerces-to constraint"
 
+    member __.IsAssociatedWithConstraint = 
+        match cx with 
+        | TyparConstraint.Associated _ -> true 
+        | _ -> false
+
+    member __.AssociatedWithTarget = 
+        match cx with 
+        | TyparConstraint.Associated(ty,_) -> FSharpType(cenv,  ty) 
+        | _ -> invalidOp "not an associated-with constraint"
+
     member __.IsDefaultsToConstraint = 
         match cx with 
         | TyparConstraint.DefaultsTo _ -> true 

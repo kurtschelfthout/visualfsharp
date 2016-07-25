@@ -2034,6 +2034,9 @@ and
     /// Indicates a constraint that a type is a subtype of the given type 
     | CoercesTo              of TType * range
 
+    /// Indicates a type implies the solution of any free type variables in the given type
+    | Associated  of TType * range
+
     /// Indicates a default value for an inference type variable should it be neither generalized nor solved 
     | DefaultsTo             of int * TType * range 
     

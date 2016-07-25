@@ -16864,12 +16864,17 @@ let CheckValueRestriction denvAtEnd rootSigOpt implFileTypePriorToSig m =
 
 
 let SolveInternalUnknowns g cenv nenv denvAtEnd mexpr extraAttribs =
-  for i in 0 .. 10 do
+  let rec loop() = 
     let unsolved = Microsoft.FSharp.Compiler.FindUnsolved.UnsolvedTyparsOfModuleDef g cenv.amap denvAtEnd (mexpr,extraAttribs)
 
-    unsolved |> List.iter (fun tp -> 
+    match unsolved with 
+    | [] -> ()
+    | _ -> 
+        unsolved |> List.iter (fun tp -> 
             if (tp.Rigidity <> TyparRigidity.Rigid) && not tp.IsSolved then 
                 ConstraintSolver.ChooseTyparSolutionAndSolve cenv.css nenv denvAtEnd tp)
+        loop()
+  loop()
 
 let CheckModuleSignature g cenv m denvAtEnd rootSigOpt implFileTypePriorToSig implFileSpecPriorToSig mexpr =
         match rootSigOpt with 
