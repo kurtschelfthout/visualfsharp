@@ -2668,6 +2668,12 @@ namespace Microsoft.FSharp.Core
         [<CompiledName("KeyValuePattern")>]
         val ( |KeyValue| ): keyValuePair:KeyValuePair<'Key,'Value> -> 'Key * 'Value
 
+        /// <summary>Access a trait.</summary>
+        [<RequiresExplicitTypeArguments>] 
+        [<CompiledName("Trait")>]
+        val inline trait<'T when 'T : struct> : 'T
+
+
 #if MULTI_DIMENSIONAL_EXTENSION_PROPERTIES
         type ``[,]``<'T> with 
             [<CompiledName("Length1")>]
