@@ -11,6 +11,7 @@ type MergeTrait<'T> =
 
 // mergeTwice<'T,'U  when 'U :> MergeTrait<'T>>  : 'T -> 'T
 
+let trait<'T> = Unchecked.defaultof<'T>
 
 // 6. Make type parameters implicit by automatically generalizing 'U here
 
@@ -21,15 +22,15 @@ let mergeTwice<'T, 'U when 'U :> MergeTrait<'T>>(x : 'T ) =
     let x4 = trait<'U>.Merge(x2,x2)   
     x4
 
-[<Witness; Struct>] // 1. get rid of Struct
-type MergeInt(_fake:int) =   // 2. get rid of _fake
+[<Witness>] 
+type MergeInt =  
     interface MergeTrait<int> with
         member __.Merge(a,b) = a + b
         member __.Empty = 0
 
 (*
-[<Witness; Struct>]
-type MergeInt2(_fake:int) = 
+[<Witness>]
+type MergeInt2 = 
     interface MergeTrait<int> with
         member __.Merge(a,b) = a + b
         member __.Empty = 0
@@ -40,10 +41,6 @@ type MergeInt2(_fake:int) =
 // v : int
 //
 
-
-
-
-mergeTwice 4 |> printfn "%A"
 
 
 (*
@@ -59,25 +56,14 @@ type MergeList<'T>() =
 
 type Box<'T>(x:'T) = 
     member __.Value = x
+    override __.ToString() = sprintf "Box(%A)" x
 
-// 4. Derived witnesses
-[<Witness;Struct>]
+[<Witness>]
 type MergeBox<'U when 'U :> MergeTrait<int>> =
     interface MergeTrait<Box<int>> with
         member __.Merge(a,b) = Box(trait<'U>.Merge(a.Value, b.Value))
         member __.Empty = Box(trait<'U>.Empty)
 
-
+mergeTwice 4 |> printfn "%A"
 mergeTwice (Box(4)) |> printfn "%A"
 
-
-(*
-// 5. Derived generic witnesses
-[<Witness>]
-type MergeBox<'T,'U when 'U : MergeTrait<'T>> =
-    interface MergeTrait<Box<'T>> with
-        member __.Merge(a,b) = Box(trait<'U>.Merge(a.Unbox, b.Unbox))
-        member __.Empty = Box(trait<'U>.Empty)
-
-
-*)

@@ -135,36 +135,43 @@ let rec TypeFeasiblySubsumesType ndeep g amap m ty1 canCoerce ty2 =
 
 type WitnessEnv = 
      | NoWitnessEnv  
-     | WitnessEnv  of NameResolutionEnv
-
+     | WitnessEnv  of NameResolutionEnv * (range -> Typars -> TTypes)
 
 
 let FindWitness g amap m (wenv: WitnessEnv) (traitTy: TType) =
 
     match wenv with 
-    | NoWitnessEnv -> failwith "no witness environment :("
-    | WitnessEnv nenv ->  
+    | NoWitnessEnv -> 
+        let typeText = NicePrint.stringOfTy (DisplayEnv.Empty g) traitTy
+        errorR(Error(FSComp.SR.tcNoSolutionToTrait2(typeText),m))
+        None //errorR(Error(FSComp.SR.typrelCannotResolveImplicitGenericInstantiation((DebugPrint.showType x), (DebugPrint.showType maxSoFar)),m)); maxSoFar
+    | WitnessEnv (nenv,instantiationGenerator) ->  
 
          let possibilities = 
             nenv.eTyconsByAccessNames.Values
-            |> Seq.choose (fun tcref -> 
+            |> Seq.choose (fun witnessTyconRef -> 
+            
+                 if TyconRefHasAttribute g m g.attrib_WitnessAttribute witnessTyconRef &&
+                    witnessTyconRef.IsStructOrEnumTycon then
 
-                 if TyconRefHasAttribute g m g.attrib_WitnessAttribute tcref &&
-                    tcref.IsStructOrEnumTycon &&
-                    tcref.TyparsNoRange.Length = 0 &&
-                    TypeFeasiblySubsumesType 0 g amap m traitTy CanCoerce (mkAppTy tcref [])
+                    let tinst = instantiationGenerator m (witnessTyconRef.Typars m)
+                    let witnessTyp = TType_app(witnessTyconRef,tinst)
 
-                    then Some (mkAppTy tcref [])
-
-                    else None)
+                    if TypeFeasiblySubsumesType 0 g amap m traitTy CanCoerce witnessTyp
+                    then Some witnessTyp
+                    else None
+                 else None)
             |> Seq.toList
 
          match possibilities with 
-         | [sln] -> sln
-         | [] -> failwith (sprintf "no solution to trait %s" (NicePrint.stringOfTy (DisplayEnv.Empty g) traitTy))
+         | [sln] -> Some sln
+         | [] -> 
+             let typeText = NicePrint.stringOfTy (DisplayEnv.Empty g) traitTy
+             errorR(Error(FSComp.SR.tcNoSolutionToTrait(typeText),m))
+             None
          | sln :: _ -> 
              printfn "too many solutions for trait %s" (NicePrint.stringOfTy (DisplayEnv.Empty g) traitTy)
-             sln
+             Some sln
 
 
 
@@ -198,9 +205,10 @@ let ChooseTyparSolutionAndRange g amap (wenv: WitnessEnv) (tp:Typar) =
 
                     // Traits can't act as solutions, instead we need to find an instance
                     // of the trait to act as a solution.  So go search for one.
-                    let sln = FindWitness g amap m wenv x
-                    join m sln,m
-
+                    let slnOpt = FindWitness g amap m wenv x
+                    match slnOpt with 
+                    | Some sln -> join m sln,m
+                    | None -> maxSoFar, m // an error has already been reported
                  else 
                     join m x,m
 
@@ -235,10 +243,13 @@ let ChooseTyparSolutionAndRange g amap (wenv: WitnessEnv) (tp:Typar) =
                  maxSoFar,m)
     max,m
 
-let ChooseTyparSolution g amap nenv tp = 
-    let ty,_m = ChooseTyparSolutionAndRange g amap nenv tp
+let ChooseTyparSolution g amap tp = 
+    // We don't expect to solve any trait constraints for TyChoose expressions, hence use NoWitnessEnv
+    let ty,_m = ChooseTyparSolutionAndRange g amap NoWitnessEnv tp
     if tp.Rigidity = TyparRigidity.Anon && typeEquiv g ty (TType_measure Measure.One) then
         warning(Error(FSComp.SR.csCodeLessGeneric(),tp.Range))
+    // We don't expect any required subsumptions (because we are using NoWitnessEnv), so we
+    // can throw away _reqd
     ty
 
 // Solutions can, in theory, refer to each other
@@ -275,7 +286,10 @@ let ChooseTyparSolutionsForFreeChoiceTypars g amap e =
         let ftvs = (freeInExpr CollectTyparsNoCaching e1).FreeTyvars.FreeTypars
         let tps = tps |> List.filter (Zset.memberOf ftvs)
         
-        let solutions =  tps |> List.map (ChooseTyparSolution g amap NoWitnessEnv) |> IterativelySubstituteTyparSolutions g tps
+        let solutions =  
+            tps 
+            |> List.map (ChooseTyparSolution g amap) 
+            |> IterativelySubstituteTyparSolutions g tps
         
         let tpenv = mkTyparInst tps solutions
         

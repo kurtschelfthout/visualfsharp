@@ -2683,7 +2683,7 @@ let ChooseTyparSolutionAndSolve css nenv denv tp =
     let max,m = ChooseTyparSolutionAndRange g amap nenv tp 
     let csenv = MakeConstraintSolverEnv ContextInfo.NoContext css m denv
     TryD (fun () -> SolveTyparEqualsTyp csenv 0 m NoTrace (mkTyparTy tp) max)
-         (fun err -> ErrorD(ErrorFromApplyingDefault(g,denv,tp,max,err,m)))
+          (fun err -> ErrorD(ErrorFromApplyingDefault(g,denv,tp,max,err,m)))
     |> RaiseOperationResult
 
 
