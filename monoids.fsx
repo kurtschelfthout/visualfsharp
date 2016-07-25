@@ -10,7 +10,7 @@ type MonoidIntSum =
         member __.mappend a b = a + b
 
 [<Witness>]
-type MonoidIntUrod =
+type MonoidIntProd =
     interface Monoid<int> with
         member __.mempty = 1
         member __.mappend a b = a * b
