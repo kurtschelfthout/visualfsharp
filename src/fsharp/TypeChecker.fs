@@ -2532,8 +2532,12 @@ module BindingNormalization =
                     | None -> false 
                     | Some memberFlags -> 
                          not (memberFlags.MemberKind = MemberKind.Constructor) &&
-                         not (memberFlags.MemberKind = MemberKind.ClassConstructor)) ->            
-                NormalizeStaticMemberBinding cenv (Option.get memberFlagsOpt) valSynData id vis inferredTyparDecls [] m rhsExpr 
+                         not (memberFlags.MemberKind = MemberKind.ClassConstructor)) ->     
+                let memberFlags = Option.get memberFlagsOpt       
+                if memberFlags.IsInstance
+                    // This should only be applied to Witnesses, i.e. interfaces implementing a Trait
+                    then NormalizeInstanceMemberBinding cenv memberFlags valSynData (mkSynId m "__") id None vis inferredTyparDecls [] m rhsExpr
+                    else NormalizeStaticMemberBinding cenv (Option.get memberFlagsOpt) valSynData id vis inferredTyparDecls [] m rhsExpr 
 
             | SynPat.Typed(pat',x,y) ->             
                 let (NormalizedBindingPat(pat'',e'',valSynData,typars)) = normPattern pat'
