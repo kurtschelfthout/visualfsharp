@@ -2516,7 +2516,11 @@ module BindingNormalization =
                     match longId with 
                     // x.Member in member binding patterns. 
                     | [thisId;memberId] -> NormalizeInstanceMemberBinding cenv memberFlags valSynData thisId memberId toolId vis typars args m rhsExpr 
-                    | [memberId]        -> NormalizeStaticMemberBinding cenv memberFlags valSynData memberId vis typars args m rhsExpr 
+                    | [memberId]        -> 
+                        if memberFlags.IsInstance
+                            // This should only be applied to Witnesses, i.e. interfaces implementing a Trait
+                            then NormalizeInstanceMemberBinding cenv memberFlags valSynData (mkSynId m "__") memberId toolId vis typars args m rhsExpr
+                            else NormalizeStaticMemberBinding cenv memberFlags valSynData memberId vis typars args m rhsExpr 
                     | _                 -> NormalizedBindingPat(pat,rhsExpr,valSynData,typars)
 
             // Object constructors are normalized in TcLetrec 
