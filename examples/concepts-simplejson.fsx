@@ -61,14 +61,14 @@ type CJson<'A> =
 [<Witness>]
 type CJsonJValue =
     interface CJson<JValue> with
-        member __.ToJValue a = a
-        member __.FromJValue a = Ok a
+        member ToJValue a = a
+        member FromJValue a = Ok a
 
 [<Witness>]
 type CJsonBool =
     interface CJson<bool> with
-        member __.ToJValue a = JBool a
-        member __.FromJValue a =
+        member ToJValue a = JBool a
+        member FromJValue a =
             match a with
             | JBool b -> Ok b
             | _ -> Error "not a JSON boolean"
@@ -76,8 +76,8 @@ type CJsonBool =
 [<Witness>]
 type CJsonString =
     interface CJson<string> with
-        member __.ToJValue a = JString a
-        member __.FromJValue a =
+        member ToJValue a = JString a
+        member FromJValue a =
             match a with
             | JString s -> Ok s
             | _ -> Error "not a JSON string"
@@ -85,8 +85,8 @@ type CJsonString =
 [<Witness>]
 type CJsonInt =
     interface CJson<int> with
-        member __.ToJValue a = JNumber (double a)
-        member __.FromJValue a =
+        member ToJValue a = JNumber (double a)
+        member FromJValue a =
             match a with
             | JNumber n -> Ok (int n)
             | _ -> Error "not a JSON number"
@@ -94,8 +94,8 @@ type CJsonInt =
 [<Witness>]
 type CJsonDouble =
     interface CJson<double> with
-        member __.ToJValue a = JNumber a
-        member __.FromJValue a =
+        member ToJValue a = JNumber a
+        member FromJValue a =
             match a with
             | JNumber n -> Ok n
             | _ -> Error "not a JSON number"
@@ -103,28 +103,28 @@ type CJsonDouble =
 [<Witness>]
 type CJsonArray<'A, 'CJsonA when 'CJsonA :> CJson<'A>> =
     interface CJson<'A list> with
-        member __.ToJValue xs =
+        member ToJValue xs =
             xs
-            |> List.map trait<'CJsonA>.ToJValue
+            |> List.map CJson.ToJValue
             |> JArray
 
-        member __.FromJValue a =
+        member FromJValue a =
             match a with
             | JArray xs ->
                 xs
-                |> List.map trait<'CJsonA>.FromJValue
+                |> List.map CJson.FromJValue
                 |> collect
             | _ -> Error "not a JSON array"
 
 [<Witness>]
 type CJsonDict<'A, 'CJsonA when 'CJsonA :> CJson<'A>> =
     interface CJson<Map<string, 'A>> with
-        member __.ToJValue adict =
+        member ToJValue adict =
             adict
-            |> Map.map (fun _ t -> trait<'CJsonA>.ToJValue t)
+            |> Map.map (fun _ t -> CJson.ToJValue t)
             |> JObject
 
-        member __.FromJValue a =
+        member FromJValue a =
             match a with
             | JObject dict ->
                 dict
@@ -132,7 +132,7 @@ type CJsonDict<'A, 'CJsonA when 'CJsonA :> CJson<'A>> =
                 |> List.map
                     (fun (k, v) ->
                         v
-                        |> trait<'CJsonA>.FromJValue
+                        |> CJson.FromJValue
                         |> fmap (fun v' -> (k, v')))
                 |> collect
                 |> fmap Map.ofList
@@ -143,24 +143,24 @@ type CJsonDict<'A, 'CJsonA when 'CJsonA :> CJson<'A>> =
 [<Witness>]
 type CJsonTup2<'A, 'B, 'CJsonA, 'CJsonB when 'CJsonA :> CJson<'A> and 'CJsonB :> CJson<'B>> =
     interface CJson<((string * 'A) * (string * 'B))> with
-        member __.ToJValue (((ka, va), (kb, vb))) =
-            Map.ofList [ (ka, trait<'CJsonA>.ToJValue va)
-                         (kb, trait<'CJsonB>.ToJValue vb) ]
+        member ToJValue (((ka, va), (kb, vb))) =
+            Map.ofList [ (ka, CJson.ToJValue va)
+                         (kb, CJson.ToJValue vb) ]
             |> JObject
 
-        member __.FromJValue v =
+        member FromJValue v =
             match v with
             | JObject dict ->
                 dict
                 |> Map.toList
                 |> function
                    | [ (kx, vx); (ky, vy) ] ->
-                       match (trait<'CJsonA>.FromJValue vx,
-                              trait<'CJsonB>.FromJValue vy) with
+                       match (CJson.FromJValue vx,
+                              CJson.FromJValue vy) with
                        | (Ok va, Ok vb) -> Ok ((kx, va), (ky, vb))
                        | _ ->
-                           match (trait<'CJsonB>.FromJValue vx,
-                                  trait<'CJsonA>.FromJValue vy) with
+                           match (CJson.FromJValue vx,
+                                  CJson.FromJValue vy) with
                            | (Ok vb, Ok va) -> Ok ((kx, va), (ky, vb))
                            | _ -> Error "invalid fields of object"
                    | _ -> Error "invalid object size"
