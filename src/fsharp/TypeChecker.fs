@@ -595,6 +595,18 @@ let MakeWitnessEnv (env: TcEnv) =
     let instantiationGenerator m tpsorig = ConstraintSolver.FreshenTypars m tpsorig
     WitnessEnv (env.eNameResEnv, instantiationGenerator)
 
+/// Constructs an objArgs list for a potential trait access.
+/// This will be empty if the access is not on a trait, and the default instance
+/// of some implementor of the trait otherwise.
+let mkPossibleTraitObjArgs (env: TcEnv) (cenv: cenv) m maybeTrait =
+    match maybeTrait with
+    | TType.TType_app (tyconRef, _) when TyconRefHasTraitAttribute cenv.g m tyconRef ->
+        let typar = NewInferenceTypar ()
+        let csenv = (MakeConstraintSolverEnv cenv.css m env.DisplayEnv)
+        AddConstraint csenv 0 m NoTrace typar (TyparConstraint.CoercesTo (maybeTrait, m)) |> CommitOperationResult
+        [mkDefault (m, mkTyparTy typar)]
+    | _ -> []
+
 //-------------------------------------------------------------------------
 // Generate references to the module being generated - used for
 // public items.
@@ -8533,9 +8545,15 @@ and TcItemThen cenv overallTy env tpenv (item,mItem,rest,afterResolution) delaye
     | Item.MethodGroup (methodName,minfos,_) -> 
         // Static method calls Type.Foo(arg1,...,argn) 
         let meths = List.map (fun minfo -> minfo,None) minfos
+
+        let objArgs =
+            match minfos with
+            | [] -> []
+            | x::_ -> mkPossibleTraitObjArgs env cenv mItem x.EnclosingType
+
         match delayed with 
         | (DelayedApp (atomicFlag, arg, mExprAndArg)::otherDelayed) ->
-            TcMethodApplicationThen cenv env overallTy None tpenv None [] mExprAndArg mItem methodName ad NeverMutates false meths afterResolution NormalValUse [arg] atomicFlag otherDelayed
+            TcMethodApplicationThen cenv env overallTy None tpenv None objArgs mExprAndArg mItem methodName ad NeverMutates false meths afterResolution NormalValUse [arg] atomicFlag otherDelayed
 
         | (DelayedTypeApp(tys, mTypeArgs, mExprAndTypeArgs) :: otherDelayed) ->
 
@@ -8549,9 +8567,9 @@ and TcItemThen cenv overallTy env tpenv (item,mItem,rest,afterResolution) delaye
 
               match otherDelayed with 
               | DelayedApp(atomicFlag, arg, mExprAndArg) :: otherDelayed -> 
-                  TcMethodApplicationThen cenv env overallTy None tpenv None [] mExprAndArg mItem methodName ad NeverMutates false [(minfoAfterStaticArguments, None)] afterResolution NormalValUse [arg] atomicFlag otherDelayed
+                  TcMethodApplicationThen cenv env overallTy None tpenv None objArgs mExprAndArg mItem methodName ad NeverMutates false [(minfoAfterStaticArguments, None)] afterResolution NormalValUse [arg] atomicFlag otherDelayed
               | _ -> 
-                  TcMethodApplicationThen cenv env overallTy None tpenv None [] mExprAndTypeArgs mItem methodName ad NeverMutates false [(minfoAfterStaticArguments, None)] afterResolution NormalValUse [] ExprAtomicFlag.Atomic otherDelayed
+                  TcMethodApplicationThen cenv env overallTy None tpenv None objArgs mExprAndTypeArgs mItem methodName ad NeverMutates false [(minfoAfterStaticArguments, None)] afterResolution NormalValUse [] ExprAtomicFlag.Atomic otherDelayed
 
             | None ->
 #endif
@@ -8565,16 +8583,17 @@ and TcItemThen cenv overallTy env tpenv (item,mItem,rest,afterResolution) delaye
 
             match otherDelayed with 
             | DelayedApp(atomicFlag, arg, mExprAndArg) :: otherDelayed -> 
-                TcMethodApplicationThen cenv env overallTy None tpenv (Some tyargs) [] mExprAndArg mItem methodName ad NeverMutates false meths afterResolution NormalValUse [arg] atomicFlag otherDelayed
+                TcMethodApplicationThen cenv env overallTy None tpenv (Some tyargs) objArgs mExprAndArg mItem methodName ad NeverMutates false meths afterResolution NormalValUse [arg] atomicFlag otherDelayed
             | _ -> 
-                TcMethodApplicationThen cenv env overallTy None tpenv (Some tyargs) [] mExprAndTypeArgs mItem methodName ad NeverMutates false meths afterResolution NormalValUse [] ExprAtomicFlag.Atomic otherDelayed
+                TcMethodApplicationThen cenv env overallTy None tpenv (Some tyargs) objArgs mExprAndTypeArgs mItem methodName ad NeverMutates false meths afterResolution NormalValUse [] ExprAtomicFlag.Atomic otherDelayed
 
         | _ -> 
 #if EXTENSIONTYPING
             if not minfos.IsEmpty && minfos.[0].ProvidedStaticParameterInfo.IsSome then 
                 error(Error(FSComp.SR.etMissingStaticArgumentsToMethod(),mItem))
 #endif
-            TcMethodApplicationThen cenv env overallTy None tpenv None [] mItem mItem methodName ad NeverMutates false meths afterResolution NormalValUse [] ExprAtomicFlag.Atomic delayed 
+            TcMethodApplicationThen cenv env overallTy None tpenv None objArgs mItem mItem methodName ad NeverMutates false meths afterResolution NormalValUse [] ExprAtomicFlag.Atomic delayed 
+
 
     | Item.CtorGroup(nm,minfos) ->
         let objTy = 
@@ -8810,41 +8829,30 @@ and TcItemThen cenv overallTy env tpenv (item,mItem,rest,afterResolution) delaye
             if pinfo.IsIndexer 
             then GetMemberApplicationArgs delayed cenv env tpenv 
             else ExprAtomicFlag.Atomic,None,[mkSynUnit mItem],delayed,tpenv
-        if not pinfo.IsStatic then
-            // @t-mawind
-            match pinfo.EnclosingType with
-            | TType.TType_app (tyconRef, _) when TyconRefHasTraitAttribute cenv.g mItem tyconRef ->
-                let typar = NewInferenceTypar ()
-                let csenv = (MakeConstraintSolverEnv cenv.css mItem env.DisplayEnv)
-                AddConstraint csenv 0 mItem NoTrace typar (TyparConstraint.CoercesTo (pinfo.EnclosingType, mItem)) |> CommitOperationResult
-                let receiver = mkDefault (mItem, mkTyparTy typar)
-                match delayed with 
-                | _::_ ->
-                    failwith "TODO: property sets of trait property accesses"
-                | _ ->
-                    // Trait Property Get (possibly indexer)
-                    let meths = pinfos |> GettersOfPropInfos
-                    let afterTcOverloadResolution = afterOverloadResolution |> AfterTcOverloadResolution.ForProperties nm GettersOfPropInfos
-                    if isNil meths then error (Error (FSComp.SR.tcPropertyIsNotReadable(nm),mItem))
-                    TcMethodApplicationThen cenv env overallTy None tpenv tyargsOpt [receiver] mItem mItem nm ad NeverMutates true meths afterTcOverloadResolution NormalValUse args ExprAtomicFlag.Atomic delayed
-            | _ -> error (Error (FSComp.SR.tcPropertyIsNotStatic(nm),mItem))
-        else
-            match delayed with 
-            | DelayedSet(e2,mStmt) :: otherDelayed ->
-                let args = if pinfo.IsIndexer then args else []
-                if not (isNil otherDelayed) then error(Error(FSComp.SR.tcInvalidAssignment(),mStmt))
-                // Static Property Set (possibly indexer) 
-                UnifyTypes cenv env mStmt overallTy cenv.g.unit_ty
-                let meths = pinfos |> SettersOfPropInfos
-                if isNil meths then error (Error (FSComp.SR.tcPropertyCannotBeSet1 nm,mItem))
-                // Note: static calls never mutate a struct object argument
-                TcMethodApplicationThen cenv env overallTy None tpenv tyargsOpt [] mStmt mItem nm ad NeverMutates true meths afterResolution NormalValUse (args@[e2]) ExprAtomicFlag.NonAtomic otherDelayed
-            | _ -> 
-                // Static Property Get (possibly indexer) 
-                let meths = pinfos |> GettersOfPropInfos
-                if isNil meths then error (Error (FSComp.SR.tcPropertyIsNotReadable(nm),mItem))
-                // Note: static calls never mutate a struct object argument
-                TcMethodApplicationThen cenv env overallTy None tpenv tyargsOpt [] mItem mItem nm ad NeverMutates true meths afterResolution NormalValUse args ExprAtomicFlag.Atomic delayed
+
+        let objArgs = mkPossibleTraitObjArgs env cenv mItem pinfo.EnclosingType
+
+        // We allow nonstatic properties here iff they access traits.
+        // In that case, we are converting to a nonstatic property anyway.
+        if (not pinfo.IsStatic) && (objArgs.IsEmpty) then
+            error (Error (FSComp.SR.tcPropertyIsNotStatic(nm),mItem))
+
+        match delayed with 
+        | DelayedSet(e2,mStmt) :: otherDelayed ->
+            let args = if pinfo.IsIndexer then args else []
+            if not (isNil otherDelayed) then error(Error(FSComp.SR.tcInvalidAssignment(),mStmt))
+            // Static Property Set (possibly indexer) 
+            UnifyTypes cenv env mStmt overallTy cenv.g.unit_ty
+            let meths = pinfos |> SettersOfPropInfos
+            if isNil meths then error (Error (FSComp.SR.tcPropertyCannotBeSet1 nm,mItem))
+            // Note: static calls never mutate a struct object argument
+            TcMethodApplicationThen cenv env overallTy None tpenv tyargsOpt objArgs mStmt mItem nm ad NeverMutates true meths afterResolution NormalValUse (args@[e2]) ExprAtomicFlag.NonAtomic otherDelayed
+        | _ -> 
+            // Static Property Get (possibly indexer) 
+            let meths = pinfos |> GettersOfPropInfos
+            if isNil meths then error (Error (FSComp.SR.tcPropertyIsNotReadable(nm),mItem))
+            // Note: static calls never mutate a struct object argument
+            TcMethodApplicationThen cenv env overallTy None tpenv tyargsOpt objArgs mItem mItem nm ad NeverMutates true meths afterResolution NormalValUse args ExprAtomicFlag.Atomic delayed
 
     | Item.ILField finfo -> 
 
