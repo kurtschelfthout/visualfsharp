@@ -6,10 +6,10 @@ type MergeTrait<'T> =
 
 let trait<'T> = Unchecked.defaultof<'T>
 
-let mergeTwice<'T, 'U when 'U :> MergeTrait<'T>>(x : 'T ) =       
-    let x0 = trait<'U>.Empty   
-    let x2 = trait<'U>.Merge(x,x0)   
-    let x4 = trait<'U>.Merge(x2,x2)   
+let mergeTwice(x : 'T) =
+    let x0 = trait<'U1 :> MergeTrait<'T>>.Empty
+    let x2 = trait<'U2 :> MergeTrait<'T>>.Merge(x,x0)
+    let x4 = trait<'U3 :> MergeTrait<'T>>.Merge(x2,x2)
     x4
 
 [<Witness>] 
