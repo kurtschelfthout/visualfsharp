@@ -1794,7 +1794,8 @@ type FreeVarOptions =
       includeLocalTyconReprs: bool
       includeRecdFields : bool
       includeUnionCases : bool
-      includeLocals : bool }
+      includeLocals : bool
+      includeConstraints : bool }
       
 let CollectAllNoCaching = 
     { canCache = false
@@ -1804,7 +1805,8 @@ let CollectAllNoCaching =
       includeRecdFields = true
       includeUnionCases = true
       includeTypars = true; 
-      includeLocals = true }
+      includeLocals = true 
+      includeConstraints = true }
 
 let CollectTyparsNoCaching = 
     { canCache = false
@@ -1814,7 +1816,19 @@ let CollectTyparsNoCaching =
       includeLocalTyconReprs = false
       includeRecdFields = false
       includeUnionCases = false
-      includeLocals = false }
+      includeLocals = false 
+      includeConstraints = true }
+
+let CollectTyparsNoCachingNoConstraints = 
+    {   canCache = false
+        collectInTypes = true
+        includeLocalTycons = false
+        includeTypars = true
+        includeLocalTyconReprs = false
+        includeRecdFields = false
+        includeUnionCases = false
+        includeLocals = false
+        includeConstraints = false }
 
 let CollectLocalsNoCaching = 
     { canCache = false
@@ -1824,7 +1838,8 @@ let CollectLocalsNoCaching =
       includeLocalTyconReprs = false
       includeRecdFields = false 
       includeUnionCases = false
-      includeLocals = true }
+      includeLocals = true 
+      includeConstraints = true }
 
 let CollectTyparsAndLocalsNoCaching = 
     { canCache = false
@@ -1834,7 +1849,8 @@ let CollectTyparsAndLocalsNoCaching =
       includeRecdFields = false 
       includeUnionCases = false
       includeTypars = true
-      includeLocals = true }
+      includeLocals = true 
+      includeConstraints = true }
 
 let CollectAll =
     { canCache = false
@@ -1844,7 +1860,8 @@ let CollectAll =
       includeRecdFields = true 
       includeUnionCases = true
       includeTypars = true; 
-      includeLocals = true }
+      includeLocals = true 
+      includeConstraints = true }
     
 let CollectTyparsAndLocals = // CollectAll
     { canCache = true // only cache for this one
@@ -1854,7 +1871,8 @@ let CollectTyparsAndLocals = // CollectAll
       includeLocalTycons = false
       includeLocalTyconReprs = false
       includeRecdFields = false
-      includeUnionCases = false }
+      includeUnionCases = false 
+      includeConstraints = true }
 
   
 let CollectTypars = CollectTyparsAndLocals
@@ -1931,10 +1949,11 @@ and accFreeValRefInTraitSln opts (vref:ValRef) fvs =
 
 and accFreeTyparRef opts (tp:Typar) acc = 
     if not opts.includeTypars then acc else
-    if Zset.contains tp acc.FreeTypars then acc 
-    else 
-        accFreeInTyparConstraints opts tp.Constraints
-          { acc with FreeTypars = Zset.add tp acc.FreeTypars}
+    if Zset.contains tp acc.FreeTypars then acc
+    else
+        let acc = {acc with FreeTypars=Zset.add tp acc.FreeTypars}
+        if not opts.includeConstraints then acc else
+        accFreeInTyparConstraints opts tp.Constraints acc
 
 and accFreeInType opts ty acc  = 
     match stripTyparEqns ty with 

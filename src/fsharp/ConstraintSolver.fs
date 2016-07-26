@@ -925,7 +925,7 @@ and SolveTyparSubtypeOfType (csenv:ConstraintSolverEnv) ndeep m2 trace tp ty1 =
         (if isAppTy g ty1 &&  TyconRefHasAttribute g m g.attrib_TraitAttribute (tcrefOfAppTy g ty1) then 
              // For U :> MergeTrait<T>, record the fact that solving T implies solving U,
              // hence generalizing T implied generalizing U
-             let ftvs = (freeInType CollectTyparsNoCaching ty1).FreeTypars |> Seq.toList             
+             let ftvs = (freeInType CollectTyparsNoCachingNoConstraints ty1).FreeTypars |> Seq.toList             
              ftvs |> IterateD (fun ftv -> AddConstraint csenv ndeep m2 trace ftv  (TyparConstraint.Associated(mkTyparTy tp,m)))
          else
              CompleteD

@@ -1,7 +1,11 @@
-﻿[<Trait>]
+﻿module MonoidLib
+
+[<Trait>]
 type Monoid<'T> =
     abstract mempty : 'T
     abstract mappend : 'T -> 'T -> 'T
+
+//Multiple Witnesses for same type parameter
 
 [<Witness>]
 type MonoidIntSum =
@@ -15,7 +19,10 @@ type MonoidIntProd =
         member __.mempty = 1
         member __.mappend a b = a * b
 
-let concat<'T, 'U when 'U :> Monoid<'T>> =
-    List.fold trait<'U>.mappend trait<'U>.mempty
+// Generic Witnesses
 
-concat [1;2;3;4] |> printf "%d"
+[<Witness>]
+type MonoidList<'T> =
+    interface Monoid<List<'T>> with
+        member __.mempty = []
+        member __.mappend a b = a @ b

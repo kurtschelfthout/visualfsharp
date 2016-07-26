@@ -508,6 +508,7 @@ type FreeVarOptions
 
 val CollectLocalsNoCaching : FreeVarOptions
 val CollectTyparsNoCaching : FreeVarOptions
+val CollectTyparsNoCachingNoConstraints : FreeVarOptions
 val CollectTyparsAndLocalsNoCaching : FreeVarOptions
 val CollectTyparsAndLocals : FreeVarOptions
 val CollectLocals : FreeVarOptions
