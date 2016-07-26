@@ -745,7 +745,7 @@ and solveTypMeetsTyparConstraints (csenv:ConstraintSolverEnv) ndeep m2 trace ty 
       | TyparConstraint.RequiresDefaultConstructor m2 -> SolveTypRequiresDefaultConstructor csenv ndeep m2 trace ty
       | TyparConstraint.SimpleChoice(tys,m2)          -> SolveTypChoice                     csenv ndeep m2 trace ty tys
       | TyparConstraint.CoercesTo(ty2,m2)             -> SolveTypSubsumesTypKeepAbbrevs     csenv ndeep m2 trace ty2 ty
-      | TyparConstraint.Associated _                  -> CompleteD
+      | TyparConstraint.Associated(ty2,m2)            -> SolveTypAssociated                 csenv ndeep m2 trace ty ty2
       | TyparConstraint.MayResolveMember(traitInfo,m2) -> 
           SolveMemberConstraint csenv false false ndeep m2 trace traitInfo ++ (fun _ -> CompleteD) 
     )))
@@ -909,6 +909,14 @@ and SolveTypSubsumesTypKeepAbbrevs csenv ndeep m2 trace cxsln ty1 ty2 =
    TryD (fun () -> SolveTypSubsumesTyp csenv ndeep m2 trace cxsln ty1 ty2)
         (function LocallyAbortOperationThatLosesAbbrevs -> ErrorD(ConstraintSolverTypesNotInSubsumptionRelation(denv,ty1,ty2,csenv.m,m2))
                 | err -> ErrorD err)
+
+and SolveTypAssociated (csenv:ConstraintSolverEnv) ndeep m2 trace ty ty2 =
+    let g = csenv.g
+    let m = csenv.m
+    if isTyparTy g ty then
+        AddConstraint csenv ndeep m2 trace (destTyparTy g ty) (TyparConstraint.Associated(ty2, m))
+    else
+        CompleteD
 
 //-------------------------------------------------------------------------
 // Solve and record non-equality constraints

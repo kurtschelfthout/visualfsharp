@@ -21,7 +21,17 @@ type MergeBox<'T,'U when 'U :> MergeTrait<'T>> =
 
 let mergetrait<'T,'U when 'U :> MergeTrait<'T>> = trait<'U>
 
-let mergeOnce(x : 'T) =
+let mergeTwice(x : 'T) =
     let x0 = mergetrait.Empty
     let x2 = mergetrait.Merge(x,x0)
-    x2
+    let x4 = mergetrait.Merge(x2,x2)
+    x4
+
+let mergeOnce(x : 'T) =
+    let x0 = mergetrait.Empty
+    (x0 : 'T)
+
+mergeTwice 4 |> printfn "%A"
+mergeTwice (Box(4)) |> printfn "%A"
+mergeTwice (Box(Box(4))) |> printfn "%A"
+mergeTwice (Box(Box(Box(4)))) |> printfn "%A"
