@@ -2858,6 +2858,12 @@ let TyconRefHasAttribute g m attribSpec tcref  =
                     (fun _ -> Some ())
         |> Option.isSome
 
+// @t-mawind (TODO: move to correct place)
+
+/// Check if a type definition is a trait
+let TyconRefHasTraitAttribute g m tcref =
+    TyconRefHasAttribute g m g.attrib_TraitAttribute tcref
+
 //-------------------------------------------------------------------------
 // List and reference types...
 //------------------------------------------------------------------------- 

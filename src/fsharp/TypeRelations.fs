@@ -202,7 +202,7 @@ let ChooseTyparSolutionAndRange g amap (wenv: WitnessEnv) (tp:Typar) =
              match tpc with 
              | TyparConstraint.CoercesTo(x,m) -> 
                  
-                 if isAppTy g x &&  TyconRefHasAttribute g m g.attrib_TraitAttribute (tcrefOfAppTy g x ) then
+                 if isAppTy g x && TyconRefHasTraitAttribute g m (tcrefOfAppTy g x) then
 
                     // Traits can't act as solutions, instead we need to find an instance
                     // of the trait to act as a solution.  So go search for one.

@@ -930,7 +930,7 @@ and SolveTyparSubtypeOfType (csenv:ConstraintSolverEnv) ndeep m2 trace tp ty1 =
     elif isSealedTy g ty1 then 
         SolveTypEqualsTypKeepAbbrevs csenv ndeep m2 trace (mkTyparTy tp) ty1
     else 
-        (if isAppTy g ty1 &&  TyconRefHasAttribute g m g.attrib_TraitAttribute (tcrefOfAppTy g ty1) then 
+        (if isAppTy g ty1 &&  TyconRefHasTraitAttribute g m (tcrefOfAppTy g ty1) then 
              // For U :> MergeTrait<T>, record the fact that solving T implies solving U,
              // hence generalizing T implied generalizing U
              let ftvs = (freeInType CollectTyparsNoCachingNoConstraints ty1).FreeTypars |> Seq.toList             

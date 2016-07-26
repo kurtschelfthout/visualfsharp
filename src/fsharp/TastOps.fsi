@@ -1280,6 +1280,10 @@ val TryFindTyconRefBoolAttribute : TcGlobals -> range -> BuiltinAttribInfo -> Ty
 /// Try to find a specific attribute on a type definition
 val TyconRefHasAttribute : TcGlobals -> range -> BuiltinAttribInfo -> TyconRef -> bool
 
+// @t-mawind (TODO: move to correct place)
+/// Check if a type definition is a trait
+val TyconRefHasTraitAttribute : TcGlobals -> range -> TyconRef -> bool
+
 /// Try to find the AttributeUsage attribute, looking for the value of the AllowMultiple named parameter
 val TryFindAttributeUsageAttribute : TcGlobals -> range -> TyconRef -> bool option
 
