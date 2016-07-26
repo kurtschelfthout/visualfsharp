@@ -8810,23 +8810,41 @@ and TcItemThen cenv overallTy env tpenv (item,mItem,rest,afterResolution) delaye
             if pinfo.IsIndexer 
             then GetMemberApplicationArgs delayed cenv env tpenv 
             else ExprAtomicFlag.Atomic,None,[mkSynUnit mItem],delayed,tpenv
-        if not pinfo.IsStatic then error (Error (FSComp.SR.tcPropertyIsNotStatic(nm),mItem))
-        match delayed with 
-        | DelayedSet(e2,mStmt) :: otherDelayed ->
-            let args = if pinfo.IsIndexer then args else []
-            if not (isNil otherDelayed) then error(Error(FSComp.SR.tcInvalidAssignment(),mStmt))
-            // Static Property Set (possibly indexer) 
-            UnifyTypes cenv env mStmt overallTy cenv.g.unit_ty
-            let meths = pinfos |> SettersOfPropInfos
-            if isNil meths then error (Error (FSComp.SR.tcPropertyCannotBeSet1 nm,mItem))
-            // Note: static calls never mutate a struct object argument
-            TcMethodApplicationThen cenv env overallTy None tpenv tyargsOpt [] mStmt mItem nm ad NeverMutates true meths afterResolution NormalValUse (args@[e2]) ExprAtomicFlag.NonAtomic otherDelayed
-        | _ -> 
-            // Static Property Get (possibly indexer) 
-            let meths = pinfos |> GettersOfPropInfos
-            if isNil meths then error (Error (FSComp.SR.tcPropertyIsNotReadable(nm),mItem))
-            // Note: static calls never mutate a struct object argument
-            TcMethodApplicationThen cenv env overallTy None tpenv tyargsOpt [] mItem mItem nm ad NeverMutates true meths afterResolution NormalValUse args ExprAtomicFlag.Atomic delayed
+        if not pinfo.IsStatic then
+            // @t-mawind
+            match pinfo.EnclosingType with
+            | TType.TType_app (tyconRef, _) when TyconRefHasTraitAttribute cenv.g mItem tyconRef ->
+                let typar = NewInferenceTypar ()
+                let csenv = (MakeConstraintSolverEnv cenv.css mItem env.DisplayEnv)
+                AddConstraint csenv 0 mItem NoTrace typar (TyparConstraint.CoercesTo (pinfo.EnclosingType, mItem)) |> CommitOperationResult
+                let receiver = mkDefault (mItem, mkTyparTy typar)
+                match delayed with 
+                | _::_ ->
+                    failwith "TODO: property sets of trait property accesses"
+                | _ ->
+                    // Trait Property Get (possibly indexer)
+                    let meths = pinfos |> GettersOfPropInfos
+                    let afterTcOverloadResolution = afterOverloadResolution |> AfterTcOverloadResolution.ForProperties nm GettersOfPropInfos
+                    if isNil meths then error (Error (FSComp.SR.tcPropertyIsNotReadable(nm),mItem))
+                    TcMethodApplicationThen cenv env overallTy None tpenv tyargsOpt [receiver] mItem mItem nm ad NeverMutates true meths afterTcOverloadResolution NormalValUse args ExprAtomicFlag.Atomic delayed
+            | _ -> error (Error (FSComp.SR.tcPropertyIsNotStatic(nm),mItem))
+        else
+            match delayed with 
+            | DelayedSet(e2,mStmt) :: otherDelayed ->
+                let args = if pinfo.IsIndexer then args else []
+                if not (isNil otherDelayed) then error(Error(FSComp.SR.tcInvalidAssignment(),mStmt))
+                // Static Property Set (possibly indexer) 
+                UnifyTypes cenv env mStmt overallTy cenv.g.unit_ty
+                let meths = pinfos |> SettersOfPropInfos
+                if isNil meths then error (Error (FSComp.SR.tcPropertyCannotBeSet1 nm,mItem))
+                // Note: static calls never mutate a struct object argument
+                TcMethodApplicationThen cenv env overallTy None tpenv tyargsOpt [] mStmt mItem nm ad NeverMutates true meths afterResolution NormalValUse (args@[e2]) ExprAtomicFlag.NonAtomic otherDelayed
+            | _ -> 
+                // Static Property Get (possibly indexer) 
+                let meths = pinfos |> GettersOfPropInfos
+                if isNil meths then error (Error (FSComp.SR.tcPropertyIsNotReadable(nm),mItem))
+                // Note: static calls never mutate a struct object argument
+                TcMethodApplicationThen cenv env overallTy None tpenv tyargsOpt [] mItem mItem nm ad NeverMutates true meths afterResolution NormalValUse args ExprAtomicFlag.Atomic delayed
 
     | Item.ILField finfo -> 
 

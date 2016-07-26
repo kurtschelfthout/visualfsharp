@@ -25,6 +25,10 @@ open Microsoft.FSharp.Compiler.InfoReader
 /// Create a type variable representing the use of a "_" in F# code
 val NewAnonTypar : TyparKind * range * TyparRigidity * TyparStaticReq * TyparDynamicReq -> Typar
 
+// @t-mawind TODO: clean this up.
+/// Create an inference typar
+val NewInferenceTypar : unit -> Typar
+
 /// Create an inference type variable 
 val NewInferenceType : unit -> TType
 
