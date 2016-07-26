@@ -1529,6 +1529,19 @@ and AddConstraint (csenv:ConstraintSolverEnv) ndeep m2 trace tp newConstraint  =
                      if not (HaveSameHeadType g ty1Parent ty2Parent) then CompleteD else
                      SolveTypEqualsTypKeepAbbrevs csenv ndeep m2 trace ty1Parent ty2Parent))
 
+        | (TyparConstraint.Associated(ty1,_),
+           TyparConstraint.Associated(ty2,_)) ->
+           if isTyparTy g ty1 && isTyparTy g ty2 then
+               let tp1 = destTyparTy g ty1
+               let tp2 = destTyparTy g ty1
+               let coerces1 = tp1.Constraints |> List.choose (fun tpc -> match tpc with TyparConstraint.CoercesTo(tyc,_) -> Some tyc | _ -> None)
+               let coerces2 = tp2.Constraints |> List.choose (fun tpc -> match tpc with TyparConstraint.CoercesTo(tyc,_) -> Some tyc | _ -> None)
+               coerces1 |> IterateD (fun tyc1 ->
+                   coerces2 |> IterateD (fun tyc2 ->
+                       if not (HaveSameHeadType g tyc1 tyc2) then CompleteD else
+                       SolveTypEqualsTypKeepAbbrevs csenv ndeep m2 trace ty1 ty2))
+           else CompleteD
+
         | (TyparConstraint.IsEnum (u1,_),
            TyparConstraint.IsEnum (u2,m2)) ->   
             SolveTypEqualsTypKeepAbbrevs csenv ndeep m2 trace u1 u2
