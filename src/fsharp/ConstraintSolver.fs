@@ -79,7 +79,7 @@ let NewInferenceMeasurePar () = NewCompGenTypar (TyparKind.Measure,TyparRigidity
 let NewErrorTypar () = NewCompGenTypar (TyparKind.Type,TyparRigidity.Flexible,NoStaticReq,TyparDynamicReq.No,true)
 let NewErrorMeasureVar () = NewCompGenTypar (TyparKind.Measure,TyparRigidity.Flexible,NoStaticReq,TyparDynamicReq.No,true)
 // @t-mawind TODO: clean this up.
-let NewInferenceTypar () = NewTypar (TyparKind.Type,TyparRigidity.Flexible,Typar(compgen_id,NoStaticReq,true),false,TyparDynamicReq.No,[],false,false)
+let NewInferenceTypar () = NewCompGenTypar (TyparKind.Type,TyparRigidity.Flexible,NoStaticReq,TyparDynamicReq.No,false)
 
 let NewInferenceType () = mkTyparTy (NewInferenceTypar ())
 let NewErrorType () = mkTyparTy (NewErrorTypar ())
