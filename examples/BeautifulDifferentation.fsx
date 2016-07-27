@@ -96,26 +96,21 @@ type FloatingD<'a, 'b, 'c when 'b :> Floating<'a> and 'c :> Floating<'a -> 'a>> 
         member acosh        x                   = (Floating.acosh   |><| (Floating.recip << -Floating.sqrt << sqr - Floating.fromInteger 1)) x
         member atanh        x                   = (Floating.atanh   |><| (Floating.recip << Floating.fromInteger 1 - sqr)) x
 
-let timesThree x =
-    x + x + x
+let timesThree x = x + x + x
 
-let cube x =
-    x * x * x
+let cube x = x * x * x
 
-let f1 x =
-    Fractional.fromInteger 16 / x
+let f1 x = Fractional.fromInteger 16 / x
 
-let f2 x =
-    Fractional.recip x
+let f2 x = Fractional.recip x
 
-let f3 x =
-    Floating.sqrt <| Floating.fromInteger 3 * Floating.sin x
+let f3 x = Floating.sqrt <| Floating.fromInteger 3 * Floating.sin x
 
-timesThree 2 |> printf "%d\n"
-constD 1 |> printf "%A\n"
-idD 1 |> printf "%A\n"
-timesThree (D(2.,1.)) |> printf "%A\n"
-cube (D(2.,1.)) |> printf "%A\n"
-f1 (D(2.,1.)) |> printf "%A\n"
-f2 (D(2.,1.)) |> printf "%A\n"
-f3 (D(2.,1.)) |> printf "%A\n"
+timesThree 2            |> printf "%d\n"
+constD 1                |> printf "%A\n"
+idD 1                   |> printf "%A\n"
+timesThree (D(2.,1.))   |> printf "%A\n"
+cube (D(2.,1.))         |> printf "%A\n"
+f1 (D(2.,1.))           |> printf "%A\n"
+f2 (D(2.,1.))           |> printf "%A\n"
+f3 (D(2.,1.))           |> printf "%A\n"
