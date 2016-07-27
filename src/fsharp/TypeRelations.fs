@@ -232,7 +232,14 @@ let ChooseTyparSolutionAndRange g amap (tp:Typar) =
                  errorR(Error(FSComp.SR.typrelCannotResolveAmbiguityInDelegate(),m))
                  maxSoFar,m
              | TyparConstraint.IsNonNullableStruct m -> 
-                 join m g.int_ty,m
+                // Don't try subsume check with int if this struct constraint
+                // came from a trait witness parameter.
+                // This is horrible.
+                if (List.exists (function | TyparConstraint.CoercesTo(TType.TType_app (tycon, _), _, _) -> TyconRefHasTraitAttribute g m tycon | _ -> false) tp.Constraints)
+                then
+                    maxSoFar,m
+                else
+                    join m g.int_ty,m
              | TyparConstraint.IsUnmanaged m ->
                  errorR(Error(FSComp.SR.typrelCannotResolveAmbiguityInUnmanaged(),m))
                  maxSoFar,m

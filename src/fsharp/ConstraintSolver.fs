@@ -960,7 +960,10 @@ and SolveTyparSubtypeOfType (csenv:ConstraintSolverEnv) ndeep m2 trace tp ty1 =
              // For U :> MergeTrait<T>, record the fact that solving T implies solving U,
              // hence generalizing T implied generalizing U
              let ftvs = (freeInType CollectTyparsNoCachingNoConstraints ty1).FreeTypars |> Seq.toList             
-             ftvs |> IterateD (fun ftv -> AddConstraint csenv ndeep m2 trace ftv  (TyparConstraint.Associated(mkTyparTy tp,m)))
+             (ftvs |> IterateD (fun ftv -> AddConstraint csenv ndeep m2 trace ftv  (TyparConstraint.Associated(mkTyparTy tp,m))))
+             ++ (// A trait subclass implies a struct constraint, because
+                 // all [<Witness>]es are by default structs.
+                 fun () -> AddConstraint csenv ndeep m2 trace tp (TyparConstraint.IsNonNullableStruct m))
          else
              CompleteD
         ) ++ (fun () -> AddConstraint csenv ndeep m2 trace tp (TyparConstraint.CoercesTo(ty1,m,tcenv)))
