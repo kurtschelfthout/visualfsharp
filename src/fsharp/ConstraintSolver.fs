@@ -1544,13 +1544,27 @@ and AddConstraint (csenv:ConstraintSolverEnv) ndeep m2 trace tp newConstraint  =
         | (TyparConstraint.Associated(ty1,_),
            TyparConstraint.Associated(ty2,_)) ->
            if isTyparTy g ty1 && isTyparTy g ty2 then
-               let tp1 = destTyparTy g ty1
-               let tp2 = destTyparTy g ty2
-               let coerces1 = tp1.Constraints |> List.choose (fun tpc -> match tpc with TyparConstraint.CoercesTo(tyc,_) -> Some tyc | _ -> None)
-               let coerces2 = tp2.Constraints |> List.choose (fun tpc -> match tpc with TyparConstraint.CoercesTo(tyc,_) -> Some tyc | _ -> None)
-               coerces1 |> IterateD (fun tyc1 ->
-                   coerces2 |> IterateD (fun tyc2 ->
-                       if not (typeEquiv g tyc1 tyc2) then CompleteD else
+               let collect ty =
+                   let tp = destTyparTy g ty
+                   tp.Constraints
+                   |> List.choose (function | TyparConstraint.CoercesTo(tyc,_) -> Some tyc | _ -> None)
+
+               let typeEquivOrCoercesTo g tyc1 tyc2 =
+                   let b = ref false
+                   IterateEntireHierarchyOfType
+                      (fun t1 ->
+                           IterateEntireHierarchyOfType
+                               (fun t2 ->
+                                    if (not (isObjTy g t1)) && (not (isObjTy g t2))
+                                       && (typeEquiv g t1 t2)
+                                    then b := true)
+                               g amap m AllowMultiIntfInstantiations.No tyc2)
+                      g amap m AllowMultiIntfInstantiations.No tyc1
+                   !b
+
+               ty1 |> collect |> IterateD (fun tyc1 ->
+                   ty2 |> collect |> IterateD (fun tyc2 ->
+                       if not (typeEquivOrCoercesTo g tyc1 tyc2) then CompleteD else
                        SolveTypEqualsTypKeepAbbrevs csenv ndeep m2 trace ty1 ty2))
            else CompleteD
 
