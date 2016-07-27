@@ -39,6 +39,7 @@ let constD x = D (x, Floating.fromInteger 0)
 let idD x = D (x, Floating.fromInteger 1)
 
 let (|><|) f f' (D(a, a')) = D (f a, a' * f' a)
+let (/></) f f' (D(a, a')) = D (f a, a' * f' a)
 
 let sqr x = x * x
 
@@ -69,32 +70,32 @@ type FloatingDUgly<'a, 'b when 'b :> Floating<'a>> =
         member acosh        (D(x,x'))           = D (Floating.acosh x, x' / -(Floating.sqrt <| sqr x - Floating.fromInteger 1))
         member atanh        (D(x,x'))           = D (Floating.atanh x, x' / Floating.fromInteger 1 - sqr x)*)
 
-// FloatingD with |><| to generalise over scalar chain rule
+// FloatingD with /></ to generalise over scalar chain rule
 
 [<Witness>]
 type FloatingD<'a, 'b, 'c when 'b :> Floating<'a> and 'c :> Floating<'a -> 'a>> =
     interface Floating<D<'a>> with
+        member fromInteger  x                   = constD <| Floating.fromInteger x
+        member pi                               = constD Floating.pi
         member plus         (D(x,x')) (D(y,y')) = D (x + y, x' + y')
         member times        (D(x,x')) (D(y,y')) = D (x * y, y' * x + x' * y)
-        member negate       x                   = (Floating.negate  |><| Floating.negate (Floating.fromInteger 1)) x
-        member abs          x                   = (Floating.abs     |><| Floating.signum) x
-        member signum       x                   = (Floating.signum  |><| Floating.fromInteger 0) x
-        member fromInteger  x                   = constD <| Floating.fromInteger x
-        member recip        x                   = (Floating.recip   |><| -(sqr << Floating.recip)) x
-        member pi                               = constD Floating.pi
-        member exp          x                   = (Floating.exp     |><| Floating.exp) x
-        member log          x                   = (Floating.log     |><| Floating.recip) x
-        member sqrt         x                   = (Floating.sqrt    |><| (Floating.recip << Floating.fromInteger 2 * Floating.sqrt)) x
-        member sin          x                   = (Floating.sin     |><| Floating.cos) x
-        member cos          x                   = (Floating.cos     |><| -Floating.sin) x
-        member asin         x                   = (Floating.asin    |><| (Floating.recip << Floating.sqrt << Floating.fromInteger 1 - sqr)) x
-        member acos         x                   = (Floating.acos    |><| (Floating.recip << -Floating.sqrt << Floating.fromInteger 1 - sqr)) x
-        member atan         x                   = (Floating.atan    |><| (Floating.recip << Floating.fromInteger 1 + sqr)) x
-        member sinh         x                   = (Floating.sinh    |><| Floating.cosh) x
-        member cosh         x                   = (Floating.cosh    |><| Floating.sinh) x
-        member asinh        x                   = (Floating.asinh   |><| (Floating.recip << Floating.sqrt << Floating.fromInteger 1 + sqr)) x
-        member acosh        x                   = (Floating.acosh   |><| (Floating.recip << -Floating.sqrt << sqr - Floating.fromInteger 1)) x
-        member atanh        x                   = (Floating.atanh   |><| (Floating.recip << Floating.fromInteger 1 - sqr)) x
+        member negate       x                   = x |> Floating.negate      /></    Floating.negate (Floating.fromInteger 1)
+        member abs          x                   = x |> Floating.abs         /></    Floating.signum
+        member signum       x                   = x |> Floating.signum      /></    Floating.fromInteger 0
+        member recip        x                   = x |> Floating.recip       /></    -(sqr << Floating.recip)
+        member exp          x                   = x |> Floating.exp         /></    Floating.exp
+        member log          x                   = x |> Floating.log         /></    Floating.recip
+        member sqrt         x                   = x |> Floating.sqrt        /></    (Floating.recip << Floating.fromInteger 2 * Floating.sqrt)
+        member sin          x                   = x |> Floating.sin         /></    Floating.cos
+        member cos          x                   = x |> Floating.cos         /></    -Floating.sin
+        member asin         x                   = x |> Floating.asin        /></    (Floating.recip << Floating.sqrt << Floating.fromInteger 1 - sqr)
+        member acos         x                   = x |> Floating.acos        /></    (Floating.recip << -Floating.sqrt << Floating.fromInteger 1 - sqr)
+        member atan         x                   = x |> Floating.atan        /></    (Floating.recip << Floating.fromInteger 1 + sqr)
+        member sinh         x                   = x |> Floating.sinh        /></    Floating.cosh
+        member cosh         x                   = x |> Floating.cosh        /></    Floating.sinh
+        member asinh        x                   = x |> Floating.asinh       /></    (Floating.recip << Floating.sqrt << Floating.fromInteger 1 + sqr)
+        member acosh        x                   = x |> Floating.acosh       /></    (Floating.recip << -Floating.sqrt << sqr - Floating.fromInteger 1)
+        member atanh        x                   = x |> Floating.atanh       /></    (Floating.recip << Floating.fromInteger 1 - sqr)
 
 let timesThree x = x + x + x
 
