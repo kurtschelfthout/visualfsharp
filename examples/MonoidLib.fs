@@ -41,5 +41,5 @@ type MonoidList<'T> =
         member mempty = []
         member mappend a b = a @ b
 
-let mappendTwice (x : 'T when 'U :> Monoid<'T>) =
-    trait<'U>.mappend x x |> trait<'U>.mappend x
+let mappendTwice x =
+    Monoid.mappend x x |> Monoid.mappend x

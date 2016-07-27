@@ -3,14 +3,14 @@
 
 open MonoidLib
 
-let concat(*<'T, 'U when 'U :> Monoid<'T>>*) (xs : 'T list when 'U :> Monoid<'T>) =
-    List.fold trait<'U>.mappend trait<'U>.mempty xs
+let invert x =
+    Group.neg x
 
-let invert (x : 'T when 'U :> Group<'T>) =
-    trait<'U>.neg x
+(*let concat<'T, 'U when 'U :> Monoid<'T>> (xs : 'T list) =
+    List.fold trait<'U>.mappend trait<'U>.mempty xs*)
 
-(*let concat xs =
-    List.fold Monoid.mappend Monoid.mempty xs*)
+let concat xs =
+    List.fold Monoid.mappend Monoid.mempty xs
 
 (*
 Higher-kinded types
