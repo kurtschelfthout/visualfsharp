@@ -6,7 +6,7 @@ open Numeric
 // Numeric overloadings for function types
 
 [<Witness>]
-type FloatingFunc<'a,'b,'c when 'c :> Floating<'b>> =
+type FloatingFunc<'a, 'b, 'c when 'c :> Floating<'b>> =
     interface Floating<'a -> 'b> with
         member plus a b         = fun x -> a x + b x
         member times a b        = fun x -> a x * b x
