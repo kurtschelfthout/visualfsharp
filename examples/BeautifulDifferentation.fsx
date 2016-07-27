@@ -6,32 +6,30 @@ open Numeric
         
 // Numeric overloadings for function types
 
-let constFunc x _ = x
-
 [<Witness>]
 type FloatingFunc<'a,'b,'c when 'c :> Floating<'b>> =
     interface Floating<'a -> 'b> with
-        member plus a b = fun x -> Floating.plus (a x) (b x)
-        member times a b = fun x -> Floating.times (a x) (b x)
-        member negate a = Floating.negate << a
-        member abs a =  Floating.abs << a
-        member signum a = Floating.signum << a
-        member fromInteger a = constFunc (Floating.fromInteger a)
-        member recip a = Floating.recip << a
-        member pi = constFunc Floating.pi
-        member exp a = Floating.exp << a
-        member log a = Floating.log << a
-        member sqrt a = Floating.sqrt << a
-        member sin a = Floating.sin << a
-        member cos a = Floating.cos << a
-        member asin a = Floating.asin << a
-        member acos a = Floating.acos << a
-        (*member atan a = Floating.atan << a
-        member sinh a = Floating.sinh << a
-        member cosh a = Floating.cosh << a
-        member asinh a = Floating.asinh << a
-        member acosh a = Floating.acosh << a
-        member atanh a = Floating.atanh << a*)
+        member plus a b         = fun x -> Floating.plus (a x) (b x)
+        member times a b        = fun x -> Floating.times (a x) (b x)
+        member negate a         = Floating.negate << a
+        member abs a            = Floating.abs << a
+        member signum a         = Floating.signum << a
+        member fromInteger a    = fun _ -> Floating.fromInteger a
+        member recip a          = Floating.recip << a
+        member pi               = fun _ -> Floating.pi
+        member exp a            = Floating.exp << a
+        member log a            = Floating.log << a
+        member sqrt a           = Floating.sqrt << a
+        member sin a            = Floating.sin << a
+        member cos a            = Floating.cos << a
+        member asin a           = Floating.asin << a
+        member acos a           = Floating.acos << a
+        member atan a           = Floating.atan << a
+        member sinh a           = Floating.sinh << a
+        member cosh a           = Floating.cosh << a
+        member asinh a          = Floating.asinh << a
+        member acosh a          = Floating.acosh << a
+        member atanh a          = Floating.atanh << a
 
 type D<'a> = D of 'a * 'a
 
@@ -49,31 +47,10 @@ type FloatingD<'a, 'b, 'c when 'b :> Floating<'a> and 'c :> Floating<'a -> 'a>> 
         member negate a = (Floating.negate |><| Floating.negate (Floating.fromInteger 1)) a*)
 
 
-// Witnesses for type D 'a
-
-(*[<Witness>]
-type NumD<'a, 'b when 'b :> Num<'a>> =
-    interface Num<D<'a>> with
-        member plus (D(x,x')) (D(y,y')) = D(x + y, x' + y')
-        member times (D(x,x')) (D(y,y')) = D(x * y, (y' * x) + (x' * y))
-        member negate (D(x,x')) = D(-x, -x')
-        member signum (D(x,_)) = D(Num.signum x, Num.fromInteger 0)
-        member abs (D(x,x')) = D(Num.abs x, x' * (Num.signum x))
-        member fromInteger x = constD (Num.fromInteger x)*)
+// Witness for type D 'a
 
 let sqr (x : 'T when 'U :> Num<'T>) =
     Num.times x x
-
-(*[<Witness>]
-type FractionalD<'a, 'b when 'b :> Fractional<'a>> =
-    interface Fractional<D<'a>> with
-        member plus (D(x,x')) (D(y,y')) = D(x + y, x' + y')
-        member times (D(x,x')) (D(y,y')) = D(x * y, (y' * x) + (x' * y))
-        member negate (D(x,x')) = D(-x, -x')
-        member signum (D(x,_)) = D(Fractional.signum x, Fractional.fromInteger 0)
-        member abs (D(x,x')) = D(Fractional.abs x, x' * (Fractional.signum x))
-        member fromInteger x = constD (Fractional.fromInteger x)
-        member recip (D(x,x')) = D(Fractional.recip x, -x' / (sqr x))*)
 
 [<Witness>]
 type FloatingD<'a, 'b when 'b :> Floating<'a>> =
@@ -93,6 +70,12 @@ type FloatingD<'a, 'b when 'b :> Floating<'a>> =
         member cos          (D(x,x'))           = D (Floating.cos x, -x' * Floating.sin x)
         member asin         (D(x,x'))           = D (Floating.asin x, x' / (Floating.sqrt <| Floating.fromInteger 1 - sqr x))
         member acos         (D(x,x'))           = D (Floating.acos x, x' / -(Floating.sqrt <| Floating.fromInteger 1 - sqr x))
+        member atan         (D(x,x'))           = D (Floating.atan x, x' / Floating.fromInteger 1 + sqr x)
+        member sinh         (D(x,x'))           = D (Floating.sinh x, x' * Floating.cosh x)
+        member cosh         (D(x,x'))           = D (Floating.cosh x, x' * Floating.sinh x)
+        member asinh        (D(x,x'))           = D (Floating.asinh x, x' / (Floating.sqrt <| Floating.fromInteger 1 + sqr x))
+        member acosh        (D(x,x'))           = D (Floating.acosh x, x' / -(Floating.sqrt <| sqr x - Floating.fromInteger 1))
+        member atanh        (D(x,x'))           = D (Floating.atanh x, x' / Floating.fromInteger 1 - sqr x)
 
 let plusTwice x =
     x + x + x

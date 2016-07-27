@@ -86,12 +86,12 @@ type Floating<'a> =
     abstract cos : 'a -> 'a
     abstract asin : 'a -> 'a
     abstract acos : 'a -> 'a
-    (*abstract atan : 'a -> 'a
+    abstract atan : 'a -> 'a
     abstract sinh : 'a -> 'a
     abstract cosh : 'a -> 'a
     abstract asinh : 'a -> 'a
     abstract acosh : 'a -> 'a
-    abstract atanh : 'a -> 'a*)
+    abstract atanh : 'a -> 'a
 
 [<Witness>]
 type FloatingDouble =
@@ -115,12 +115,12 @@ type FloatingDouble =
         member cos a = Operators.cos a
         member asin a = Operators.asin a
         member acos a = Operators.acos a
-        (*member atan a = Operators.atan a
+        member atan a = Operators.atan a
         member sinh a = Operators.sinh a
         member cosh a = Operators.cosh a
         member asinh a = Operators.log (a + Operators.sqrt (1. + a * a))
         member acosh a = Operators.log (a + Operators.sqrt (a * a - 1.))
-        member atanh a = 0.5 * (Operators.log (1. + a) - Operators.log (1. - a))*)
+        member atanh a = 0.5 * (Operators.log (1. + a) - Operators.log (1. - a))
         
 //Operator wrappers
 
