@@ -1,126 +1,8 @@
 ﻿
-// Num Typeclass
+#I "bin"
+#r "Numeric"
 
-[<Trait>]
-type Num<'a> =
-    abstract plus : 'a -> 'a -> 'a
-    abstract times : 'a -> 'a -> 'a
-    abstract negate : 'a -> 'a
-    abstract abs : 'a -> 'a
-    abstract signum : 'a -> 'a
-    abstract fromInteger : int -> 'a
-
-[<Witness>]
-type NumInt =
-    interface Num<int> with
-        member plus a b = a + b
-        member times a b = a * b
-        member negate a = -a
-        member abs a = abs a
-        member signum a =
-            match a with
-                | a when a > 0 -> 1
-                | a when a = 0 -> 0
-                | a -> -1
-        member fromInteger a = a
-
-[<Witness>]
-type NumDouble =
-    interface Num<double> with
-        member plus a b = a + b
-        member times a b = a * b
-        member negate a = -a
-        member abs a = abs a
-        member signum a =
-            match a with
-                | a when a > 0. -> 1.
-                | a when a = 0. -> 0.
-                | a -> -1.
-        member fromInteger a = double a
-
-[<Trait>]
-type Fractional<'a> =
-    inherit Num<'a>
-    abstract recip : 'a -> 'a
-    //default div a b = a * recip b
-
-[<Witness>]
-type FractionalInt =
-    interface Fractional<int> with
-        member plus a b = a + b
-        member times a b = a * b
-        member negate a = -a
-        member abs a = abs a
-        member signum a =
-            match a with
-                | a when a > 0 -> 1
-                | a when a = 0 -> 0
-                | a -> -1
-        member fromInteger a = a
-        member recip a = 1 / a
-
-[<Witness>]
-type FractionalDouble =
-    interface Fractional<double> with
-        member plus a b = a + b
-        member times a b = a * b
-        member negate a = -a
-        member abs a = abs a
-        member signum a =
-            match a with
-                | a when a > 0. -> 1.
-                | a when a = 0. -> 0.
-                | a -> -1.
-        member fromInteger a = double a
-        member recip a = 1. / a
-
-[<Trait>]
-type Floating<'a> =
-    inherit Fractional<'a>
-    abstract pi : 'a
-    abstract exp : 'a -> 'a
-    abstract log : 'a -> 'a
-    abstract sqrt : 'a -> 'a
-    abstract sin : 'a -> 'a
-    abstract cos : 'a -> 'a
-    abstract asin : 'a -> 'a
-    abstract acos : 'a -> 'a
-    (*abstract atan : 'a -> 'a
-    abstract sinh : 'a -> 'a
-    abstract cosh : 'a -> 'a
-    abstract asinh : 'a -> 'a
-    abstract acosh : 'a -> 'a
-    abstract atanh : 'a -> 'a*)
-
-[<Witness>]
-type FloatingDouble =
-    interface Floating<double> with
-        member plus a b = a + b
-        member times a b = a * b
-        member negate a = -a
-        member abs a = abs a
-        member signum a =
-            match a with
-                | a when a > 0. -> 1.
-                | a when a = 0. -> 0.
-                | a -> -1.
-        member fromInteger a = double a
-        member recip a = 1. / a
-        member pi = System.Math.PI
-        member exp a = Operators.exp a
-        member log a = Operators.log a
-        member sqrt a = Operators.sqrt a
-        member sin a = Operators.sin a
-        member cos a = Operators.cos a
-        member asin a = Operators.asin a
-        member acos a = Operators.acos a
-        (*member atan a = Operators.atan a
-        member sinh a = Operators.sinh a
-        member cosh a = Operators.cosh a
-        member asinh a = Operators.log (a + Operators.sqrt (1. + a * a))
-        member acosh a = Operators.log (a + Operators.sqrt (a * a - 1.))
-        member atanh a = 0.5 * (Operators.log (1. + a) - Operators.log (1. - a))*)
-
+open Numeric
         
 // Numeric overloadings for function types
 
@@ -159,7 +41,6 @@ let idD x = D(x, Floating.fromInteger 1)
 
 let (|><|) f f' (D(a, a')) = D(f a, Floating.times a' (f' a))
 
-
 //FloatingD with |><| to generalise over scalar chain rule
 
 (*[<Witness>]
@@ -167,70 +48,66 @@ type FloatingD<'a, 'b, 'c when 'b :> Floating<'a> and 'c :> Floating<'a -> 'a>> 
     interface Floating<D<'a>> with
         member negate a = (Floating.negate |><| Floating.negate (Floating.fromInteger 1)) a*)
 
-//Helper wrappers
-let (+) = Num.plus
-let (-) a b = Num.plus a (Num.negate b)
-let (*) = Num.times
 
 // Witnesses for type D 'a
 
-[<Witness>]
+(*[<Witness>]
 type NumD<'a, 'b when 'b :> Num<'a>> =
     interface Num<D<'a>> with
         member plus (D(x,x')) (D(y,y')) = D(x + y, x' + y')
         member times (D(x,x')) (D(y,y')) = D(x * y, (y' * x) + (x' * y))
-        member negate (D(x,x')) = D(Num.negate x, Num.negate x')
+        member negate (D(x,x')) = D(-x, -x')
         member signum (D(x,_)) = D(Num.signum x, Num.fromInteger 0)
-        member abs (D(x,x')) = D(Num.abs x, Num.times x' (Num.signum x))
-        member fromInteger x = constD (Num.fromInteger x)
+        member abs (D(x,x')) = D(Num.abs x, x' * (Num.signum x))
+        member fromInteger x = constD (Num.fromInteger x)*)
 
 let sqr (x : 'T when 'U :> Num<'T>) =
-    trait<'U>.times x x
+    Num.times x x
 
-[<Witness>]
+(*[<Witness>]
 type FractionalD<'a, 'b when 'b :> Fractional<'a>> =
     interface Fractional<D<'a>> with
-        member plus (D(x,x')) (D(y,y')) = D(Fractional.plus x y, Fractional.plus x' y')
-        member times (D(x,x')) (D(y,y')) = D(Fractional.times x y, Fractional.plus (Fractional.times y' x) (Fractional.times x' y))
-        member negate (D(x,x')) = D(Fractional.negate x, Fractional.negate x')
+        member plus (D(x,x')) (D(y,y')) = D(x + y, x' + y')
+        member times (D(x,x')) (D(y,y')) = D(x * y, (y' * x) + (x' * y))
+        member negate (D(x,x')) = D(-x, -x')
         member signum (D(x,_)) = D(Fractional.signum x, Fractional.fromInteger 0)
-        member abs (D(x,x')) = D(Fractional.abs x, Fractional.times x' (Fractional.signum x))
+        member abs (D(x,x')) = D(Fractional.abs x, x' * (Fractional.signum x))
         member fromInteger x = constD (Fractional.fromInteger x)
-        member recip (D(x,x')) = D(Fractional.recip x, Fractional.negate (Fractional.times x' (Fractional.recip (sqr x))))
+        member recip (D(x,x')) = D(Fractional.recip x, -x' / (sqr x))*)
 
 [<Witness>]
-type FloatingDUgly<'a, 'b when 'b :> Floating<'a>> =
+type FloatingD<'a, 'b when 'b :> Floating<'a>> =
     interface Floating<D<'a>> with
-        member plus (D(x,x')) (D(y,y')) = D(Floating.plus x y, Floating.plus x' y')
-        member times (D(x,x')) (D(y,y')) = D(Floating.times x y, Floating.plus (Floating.times y' x) (Floating.times x' y))
-        member negate (D(x,x')) = D(Floating.negate x, Floating.negate x')
-        member signum (D(x,_)) = D(Floating.signum x, Floating.fromInteger 0)
-        member abs (D(x,x')) = D(Floating.abs x, Floating.times x' (Floating.signum x))
-        member fromInteger x = constD (Floating.fromInteger x)
-        member recip (D(x,x')) = D(Floating.recip x, Floating.negate (Floating.times x' (Floating.recip (sqr x))))
-        member pi = constD Floating.pi
-        member exp (D(x,x')) = D(Floating.exp x, Floating.times x' (Floating.exp x))
-        member log (D(x,x')) = D(Floating.log x, Floating.times x' (Floating.recip x))
-        member sqrt (D(x,x')) = D(Floating.sqrt x, Floating.times x' (Floating.recip (Floating.times (Floating.fromInteger 2) (Floating.sqrt x))))
-        member sin (D(x,x')) = D(Floating.sin x, Floating.times x' (Floating.cos x))
-        member cos (D(x,x')) = D(Floating.cos x, Floating.times x' (Floating.negate (Floating.sin x)))
-        member asin (D(x,x')) = D(Floating.asin x, Floating.times x' (Floating.recip (Floating.sqrt (Floating.plus (Floating.fromInteger 1) (Floating.negate (sqr x))))))
-        member acos (D(x,x')) = D(Floating.acos x, Floating.times x' (Floating.recip (Floating.negate (Floating.sqrt (Floating.plus (Floating.fromInteger 1) (Floating.negate (sqr x)))))))
+        member plus         (D(x,x')) (D(y,y')) = D (x + y, x' + y')
+        member times        (D(x,x')) (D(y,y')) = D (x * y, y' * x + x' * y)
+        member negate       (D(x,x'))           = D (-x, -x')
+        member signum       (D(x,_))            = D (Floating.signum x, Floating.fromInteger 0)
+        member abs          (D(x,x'))           = D (Floating.abs x, x' * Floating.signum x)
+        member fromInteger  x                   = constD <| Floating.fromInteger x
+        member recip        (D(x,x'))           = D (Floating.recip x, -x' / sqr x)
+        member pi                               = constD Floating.pi
+        member exp          (D(x,x'))           = D (Floating.exp x, x' * Floating.exp x)
+        member log          (D(x,x'))           = D (Floating.log x, x' / x)
+        member sqrt         (D(x,x'))           = D (Floating.sqrt x, x' / (Floating.fromInteger 2 * Floating.sqrt x))
+        member sin          (D(x,x'))           = D (Floating.sin x, x' * Floating.cos x)
+        member cos          (D(x,x'))           = D (Floating.cos x, -x' * Floating.sin x)
+        member asin         (D(x,x'))           = D (Floating.asin x, x' / (Floating.sqrt <| Floating.fromInteger 1 - sqr x))
+        member acos         (D(x,x'))           = D (Floating.acos x, x' / -(Floating.sqrt <| Floating.fromInteger 1 - sqr x))
 
 let plusTwice x =
-    Num.plus x x |> Num.plus x
+    x + x + x
 
 let cube x =
-    Num.times x x |> Num.times x
+    x * x * x
 
 let f1 x =
-    Fractional.times (Fractional.fromInteger 16) (Fractional.recip x)
+    Fractional.fromInteger 16 / x
 
 let f2 x =
     Fractional.recip x
 
 let f3 x =
-    Floating.sqrt (Floating.times (Floating.fromInteger 3) (Floating.sin x))
+    Floating.sqrt <| Floating.fromInteger 3 * Floating.sin x
 
 plusTwice 2 |> printf "%d\n"
 constD 1 |> printf "%A\n"
