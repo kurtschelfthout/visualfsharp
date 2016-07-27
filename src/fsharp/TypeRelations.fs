@@ -162,9 +162,14 @@ let FindWitness g amap m tcenv (traitTy: TType) =
              let typeText = NicePrint.stringOfTy (DisplayEnv.Empty g) traitTy
              errorR(Error(FSComp.SR.tcNoSolutionToTrait(typeText),m))
              None
-         | sln :: _ -> 
-             printfn "Too many solutions for trait %s:" (NicePrint.stringOfTy (DisplayEnv.Empty g) traitTy)
-             let _ = possibilities |> List.map (fun possTy -> printfn "Possibility: %s" (NicePrint.stringOfTy (DisplayEnv.Empty g) possTy))
+         | sln :: _ ->
+             let traitText = NicePrint.stringOfTy (DisplayEnv.Empty g) traitTy
+             let chosenText = NicePrint.stringOfTy (DisplayEnv.Empty g) sln
+             let possText =
+                possibilities
+                |> List.map (fun possTy -> "'" + (NicePrint.stringOfTy (DisplayEnv.Empty g) possTy) + "'")
+                |> String.concat ", "
+             warning(Error(FSComp.SR.tcMultipleSolutionsToTrait(traitText, chosenText, possText), m))
              Some sln
 
 
