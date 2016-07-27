@@ -12,6 +12,7 @@ open Microsoft.FSharp.Compiler
 open Microsoft.FSharp.Compiler.AccessibilityLogic
 open Microsoft.FSharp.Compiler.Ast
 open Microsoft.FSharp.Compiler.ErrorLogger
+open Microsoft.FSharp.Compiler.NameResolution
 open Microsoft.FSharp.Compiler.Tast
 open Microsoft.FSharp.Compiler.Range
 open Microsoft.FSharp.Compiler.Import
@@ -43,13 +44,13 @@ val NewInferenceTypes : 'a list -> TType list
 
 /// Given a set of formal type parameters and their constraints, make new inference type variables for
 /// each and ensure that the constraints on the new type variables are adjusted to refer to these.
-val FreshenAndFixupTypars : range -> TyparRigidity -> Typars -> TType list -> Typars -> Typars * TyparInst * TType list
+val FreshenAndFixupTypars : TcGlobals -> WitnessEnv -> range -> TyparRigidity -> Typars -> TType list -> Typars -> Typars * TyparInst * TType list
 
-val FreshenTypeInst : range -> Typars -> Typars * TyparInst * TType list
+val FreshenTypeInst : TcGlobals -> WitnessEnv -> range -> Typars -> Typars * TyparInst * TType list
 
-val FreshenTypars : range -> Typars -> TType list
+val FreshenTypars : TcGlobals -> WitnessEnv -> range -> Typars -> TType list
 
-val FreshenMethInfo : range -> MethInfo -> TType list
+val FreshenMethInfo : TcGlobals -> WitnessEnv -> range -> MethInfo -> TType list
 
 [<RequireQualifiedAccess>] 
 /// Information about the context of a type equation.
@@ -96,11 +97,11 @@ type TcValF = (ValRef -> ValUseFlag -> TType list -> range -> Expr * TType)
 type ConstraintSolverState =
     static member New: TcGlobals * Import.ImportMap * InfoReader * TcValF -> ConstraintSolverState
 
-type ConstraintSolverEnv 
+type ConstraintSolverEnv
 
 val BakedInTraitConstraintNames : Set<string>
 
-val MakeConstraintSolverEnv : ContextInfo -> ConstraintSolverState -> range -> DisplayEnv -> ConstraintSolverEnv
+val MakeConstraintSolverEnv : ContextInfo -> ConstraintSolverState -> range -> WitnessEnv -> DisplayEnv -> ConstraintSolverEnv
 
 [<Sealed; NoEquality; NoComparison>]
 type Trace 
@@ -117,28 +118,28 @@ val ResolveOverloading                       : ConstraintSolverEnv -> OptionalTr
 val UnifyUniqueOverloading                   : ConstraintSolverEnv -> int * int -> string -> AccessorDomain -> CalledMeth<SynExpr> list -> TType -> OperationResult<bool> 
 val EliminateConstraintsForGeneralizedTypars : ConstraintSolverEnv -> OptionalTrace -> Typars -> unit 
 
-val CheckDeclaredTypars                       : DisplayEnv -> ConstraintSolverState -> range -> Typars -> Typars -> unit 
+val CheckDeclaredTypars                       : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> Typars -> Typars -> unit 
 
 val AddConstraint                             : ConstraintSolverEnv -> int -> Range.range -> OptionalTrace -> Typar -> TyparConstraint -> OperationResult<unit>
-val AddCxTypeEqualsType                       : ContextInfo -> DisplayEnv -> ConstraintSolverState -> range -> TType -> TType -> unit
-val AddCxTypeEqualsTypeUndoIfFailed           : DisplayEnv -> ConstraintSolverState -> range -> TType -> TType -> bool
-val AddCxTypeEqualsTypeMatchingOnlyUndoIfFailed : DisplayEnv -> ConstraintSolverState -> range -> TType -> TType -> bool
-val AddCxTypeMustSubsumeType                  : ContextInfo -> DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> TType -> unit
-val AddCxTypeMustSubsumeTypeUndoIfFailed      : DisplayEnv -> ConstraintSolverState -> range -> TType -> TType -> bool
-val AddCxTypeMustSubsumeTypeMatchingOnlyUndoIfFailed : DisplayEnv -> ConstraintSolverState -> range -> TType -> TType -> bool
-val AddCxMethodConstraint                     : DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TraitConstraintInfo -> unit
-val AddCxTypeMustSupportNull                  : DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
-val AddCxTypeMustSupportComparison            : DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
-val AddCxTypeMustSupportEquality              : DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
-val AddCxTypeMustSupportDefaultCtor           : DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
-val AddCxTypeIsReferenceType                  : DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
-val AddCxTypeIsValueType                      : DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
-val AddCxTypeIsUnmanaged                      : DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
-val AddCxTypeIsEnum                           : DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> TType -> unit
-val AddCxTypeIsDelegate                       : DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> TType -> TType -> unit
+val AddCxTypeEqualsType                       : WitnessEnv -> ContextInfo -> DisplayEnv -> ConstraintSolverState -> range -> TType -> TType -> unit
+val AddCxTypeEqualsTypeUndoIfFailed           : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> TType -> TType -> bool
+val AddCxTypeEqualsTypeMatchingOnlyUndoIfFailed : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> TType -> TType -> bool
+val AddCxTypeMustSubsumeType                  : WitnessEnv -> ContextInfo -> DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> TType -> unit
+val AddCxTypeMustSubsumeTypeUndoIfFailed      : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> TType -> TType -> bool
+val AddCxTypeMustSubsumeTypeMatchingOnlyUndoIfFailed : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> TType -> TType -> bool
+val AddCxMethodConstraint                     : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TraitConstraintInfo -> unit
+val AddCxTypeMustSupportNull                  : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
+val AddCxTypeMustSupportComparison            : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
+val AddCxTypeMustSupportEquality              : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
+val AddCxTypeMustSupportDefaultCtor           : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
+val AddCxTypeIsReferenceType                  : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
+val AddCxTypeIsValueType                      : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
+val AddCxTypeIsUnmanaged                      : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> unit
+val AddCxTypeIsEnum                           : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> TType -> unit
+val AddCxTypeIsDelegate                       : WitnessEnv -> DisplayEnv -> ConstraintSolverState -> range -> OptionalTrace -> TType -> TType -> TType -> unit
 
-val CodegenWitnessThatTypSupportsTraitConstraint : TcValF -> TcGlobals -> ImportMap -> range -> TraitConstraintInfo -> Expr list -> OperationResult<Expr option>
+val CodegenWitnessThatTypSupportsTraitConstraint : TcValF -> TcGlobals -> ImportMap -> range -> WitnessEnv -> TraitConstraintInfo -> Expr list -> OperationResult<Expr option>
 
 val ChooseTyparSolutionAndSolve : ConstraintSolverState -> TypeRelations.WitnessEnv -> DisplayEnv -> Typar -> unit
 
-val IsApplicableMethApprox : TcGlobals -> ImportMap -> range -> MethInfo -> TType -> bool
+val IsApplicableMethApprox : TcGlobals -> ImportMap -> range -> WitnessEnv -> MethInfo -> TType -> bool

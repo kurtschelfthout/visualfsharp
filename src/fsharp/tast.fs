@@ -2032,7 +2032,7 @@ and
     [<NoEquality; NoComparison; RequireQualifiedAccess>]
     TyparConstraint = 
     /// Indicates a constraint that a type is a subtype of the given type 
-    | CoercesTo              of TType * range
+    | CoercesTo              of TType * range * (TyconRef list * (range -> Typars -> TTypes)) option
 
     /// Indicates a type implies the solution of any free type variables in the given type
     | Associated  of TType * range

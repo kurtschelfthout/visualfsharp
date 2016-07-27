@@ -225,8 +225,8 @@ and remapTypesAux tyenv types = List.mapq (remapTypeAux tyenv) types
 and remapTyparConstraintsAux tyenv cs =
    cs |>  List.choose (fun x -> 
          match x with 
-         | TyparConstraint.CoercesTo(ty,m) -> 
-             Some(TyparConstraint.CoercesTo (remapTypeAux tyenv ty,m))
+         | TyparConstraint.CoercesTo(ty,m,tcrefs) -> 
+             Some(TyparConstraint.CoercesTo (remapTypeAux tyenv ty,m,tcrefs))
          | TyparConstraint.Associated(ty,m) -> 
              Some(TyparConstraint.Associated(remapTypeAux tyenv ty,m))
          | TyparConstraint.MayResolveMember(traitInfo,m) -> 
@@ -818,8 +818,8 @@ and returnTypesAEquivAux erasureFlag g aenv rty rty2 =
     
 and typarConstraintsAEquivAux erasureFlag g aenv tpc1 tpc2 =
     match tpc1,tpc2 with
-    | TyparConstraint.CoercesTo(acty,_),
-      TyparConstraint.CoercesTo(fcty,_) -> 
+    | TyparConstraint.CoercesTo(acty,_,_),
+      TyparConstraint.CoercesTo(fcty,_,_) -> 
         typeAEquivAux erasureFlag g aenv acty fcty
 
     | TyparConstraint.Associated(acty,_),
@@ -1901,7 +1901,7 @@ and accFreeInTyparConstraints opts cxs acc =
 
 and accFreeInTyparConstraint opts tpc acc =
     match tpc with 
-    | TyparConstraint.CoercesTo(typ,_) -> accFreeInType opts typ acc
+    | TyparConstraint.CoercesTo(typ,_,_) -> accFreeInType opts typ acc
     | TyparConstraint.Associated(typ,_) -> accFreeInType opts typ acc
     | TyparConstraint.MayResolveMember (traitInfo,_) -> accFreeInTrait opts traitInfo acc
     | TyparConstraint.DefaultsTo(_,rty,_) -> accFreeInType opts rty acc
@@ -2008,7 +2008,7 @@ and accFreeInTyparConstraintsLeftToRight g cxFlag thruFlag acc cxs =
 
 and accFreeInTyparConstraintLeftToRight g cxFlag thruFlag acc tpc =
     match tpc with 
-    | TyparConstraint.CoercesTo(typ,_) -> accFreeInTypeLeftToRight g cxFlag thruFlag acc typ 
+    | TyparConstraint.CoercesTo(typ,_,_) -> accFreeInTypeLeftToRight g cxFlag thruFlag acc typ 
     | TyparConstraint.Associated(typ,_) -> accFreeInTypeLeftToRight g cxFlag thruFlag acc typ 
     | TyparConstraint.MayResolveMember (traitInfo,_) -> accFreeInTraitLeftToRight g cxFlag thruFlag acc traitInfo 
     | TyparConstraint.DefaultsTo(_,rty,_) -> accFreeInTypeLeftToRight g cxFlag thruFlag acc rty 
@@ -2480,7 +2480,7 @@ module SimplifyTypes =
             isTTyparCoercesToType tpc && 
             Zset.contains tp singletons && 
             tp.Constraints.Length = 1)
-        let inplace = inplace |> List.map (function (tp,TyparConstraint.CoercesTo(ty,_)) -> tp,ty | _ -> failwith "not isTTyparCoercesToType")
+        let inplace = inplace |> List.map (function (tp,TyparConstraint.CoercesTo(ty,_,_)) -> tp,ty | _ -> failwith "not isTTyparCoercesToType")
         
         { singletons         = singletons
           inplaceConstraints = Zmap.ofList typarOrder inplace
@@ -3173,7 +3173,7 @@ module DebugPrint = begin
     and auxTyparConstraintL env (tp,tpc) = 
         let constraintPrefix l = auxTypar2L env tp ^^ wordL (tagText ":") ^^ l
         match tpc with
-        | TyparConstraint.CoercesTo(typarConstrTyp,_) ->
+        | TyparConstraint.CoercesTo(typarConstrTyp,_,_) ->
             auxTypar2L env tp ^^ wordL (tagText ":>") --- auxTyparConstraintTypL env typarConstrTyp
         | TyparConstraint.Associated(typarConstrTyp,_) ->
             auxTypar2L env tp ^^ wordL (tagText "implies") --- auxTyparConstraintTypL env typarConstrTyp

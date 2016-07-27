@@ -17,25 +17,25 @@ open Microsoft.FSharp.Compiler.ConstraintSolver
 
 type FormatItem = Simple of TType | FuncAndVal 
 
-let copyAndFixupFormatTypar m tp = 
-    let _,_,tinst = FreshenAndFixupTypars m TyparRigidity.Flexible [] [] [tp]
+let copyAndFixupFormatTypar g m tp = 
+    let _,_,tinst = FreshenAndFixupTypars g NameResolution.NoWitnessEnv m TyparRigidity.Flexible [] [] [tp]
     List.head tinst
 
 let lowestDefaultPriority = 0 (* See comment on TyparConstraint.DefaultsTo *)
 
-let mkFlexibleFormatTypar m tys dflt = 
+let mkFlexibleFormatTypar g m tys dflt = 
     let tp = NewTypar (TyparKind.Type,TyparRigidity.Rigid,Typar(mkSynId m "fmt",HeadTypeStaticReq,true),false,TyparDynamicReq.Yes,[],false,false)
     tp.FixupConstraints [ TyparConstraint.SimpleChoice (tys,m); TyparConstraint.DefaultsTo (lowestDefaultPriority,dflt,m)]
-    copyAndFixupFormatTypar m tp
+    copyAndFixupFormatTypar g m tp
 
 let mkFlexibleIntFormatTypar (g: TcGlobals) m = 
-    mkFlexibleFormatTypar m [ g.byte_ty; g.int16_ty; g.int32_ty; g.int64_ty;  g.sbyte_ty; g.uint16_ty; g.uint32_ty; g.uint64_ty;g.nativeint_ty;g.unativeint_ty; ] g.int_ty
+    mkFlexibleFormatTypar g m [ g.byte_ty; g.int16_ty; g.int32_ty; g.int64_ty;  g.sbyte_ty; g.uint16_ty; g.uint32_ty; g.uint64_ty;g.nativeint_ty;g.unativeint_ty; ] g.int_ty
 
 let mkFlexibleDecimalFormatTypar (g: TcGlobals) m =
-    mkFlexibleFormatTypar m [ g.decimal_ty ] g.decimal_ty
+    mkFlexibleFormatTypar g m [ g.decimal_ty ] g.decimal_ty
     
 let mkFlexibleFloatFormatTypar (g: TcGlobals) m = 
-    mkFlexibleFormatTypar m [ g.float_ty; g.float32_ty; g.decimal_ty ] g.float_ty
+    mkFlexibleFormatTypar g m [ g.float_ty; g.float32_ty; g.decimal_ty ] g.float_ty
 
 let isDigit c = ('0' <= c && c <= '9')
 

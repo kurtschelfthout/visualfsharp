@@ -1042,7 +1042,7 @@ type internal FsiDynamicCompiler
         let importMap = tcImports.GetImportMap()
 
         // optimize: note we collect the incremental optimization environment 
-        let optimizedImpls, _optData, optEnv = ApplyAllOptimizations (tcConfig, tcGlobals, (LightweightTcValForUsingInBuildMethodCall tcGlobals), outfile, importMap, isIncrementalFragment, optEnv, tcState.Ccu, declaredImpls)
+        let optimizedImpls, _optData, optEnv = ApplyAllOptimizations (tcConfig, tcGlobals, (LightweightTcValForUsingInBuildMethodCall tcGlobals (TypeChecker.MakeWitnessEnv tcGlobals tcEnvAtEndOfLastInput.NameEnv)), outfile, importMap, isIncrementalFragment, optEnv, tcState.Ccu, declaredImpls)
         errorLogger.AbortOnError(fsiConsoleOutput);
             
         let fragName = textOfLid prefixPath 
@@ -1350,7 +1350,7 @@ type internal FsiDynamicCompiler
 
         let tcState = GetInitialTcState (rangeStdin, ccuName, tcConfig, tcGlobals, tcImports, niceNameGen, tcEnv)
 
-        let ilxGenerator = CreateIlxAssemblyGenerator (tcConfig, tcImports, tcGlobals, (LightweightTcValForUsingInBuildMethodCall tcGlobals), tcState.Ccu)
+        let ilxGenerator = CreateIlxAssemblyGenerator (tcConfig, tcImports, tcGlobals, (LightweightTcValForUsingInBuildMethodCall tcGlobals (TypeChecker.MakeWitnessEnv tcGlobals tcEnv.NameEnv)), tcState.Ccu)
         {optEnv    = optEnv0
          emEnv     = emEnv
          tcGlobals = tcGlobals
@@ -1366,6 +1366,55 @@ type internal FsiDynamicCompiler
 
     member __.FormatValue(obj:obj, objTy) = 
         valuePrinter.FormatValue(obj, objTy)
+
+type internal FsiIntellisenseProvider(tcGlobals, tcImports: TcImports) = 
+
+    let rangeStdin = rangeN Lexhelp.stdinMockFilename 0
+
+    //----------------------------------------------------------------------------
+    // FsiIntellisense - v1 - identifier completion - namedItemInEnvL
+    //----------------------------------------------------------------------------
+
+    member __.CompletionsForPartialLID istate (prefix:string) =
+        let lid,stem =
+            if prefix.IndexOf(".",StringComparison.Ordinal) >= 0 then
+                let parts = prefix.Split(Array.ofList ['.'])
+                let n = parts.Length
+                Array.sub parts 0 (n-1) |> Array.toList,parts.[n-1]
+            else
+                [],prefix   
+        let tcState = istate.tcState (* folded through now? *)
+
+        let amap = tcImports.GetImportMap()
+        let infoReader = new InfoReader(tcGlobals,amap)
+        let ncenv = new NameResolution.NameResolver(tcGlobals,amap,infoReader,NameResolution.FakeInstantiationGenerator)
+        // Note: for the accessor domain we should use (AccessRightsOfEnv tcState.TcEnvFromImpls)
+        let ad = AccessibleFromSomeFSharpCode
+        let nItems = NameResolution.ResolvePartialLongIdent ncenv tcState.TcEnvFromImpls.NameEnv (ConstraintSolver.IsApplicableMethApprox tcGlobals amap rangeStdin (MakeWitnessEnv tcGlobals tcState.TcEnvFromImpls.NameEnv)) rangeStdin ad lid false
+        let names  = nItems |> List.map (fun d -> d.DisplayName) 
+        let names  = names |> List.filter (fun (name:string) -> name.StartsWith(stem,StringComparison.Ordinal)) 
+        names
+
+#if FSI_SERVER_INTELLISENSE
+    //----------------------------------------------------------------------------
+    // FsiIntellisense (posible feature for v2) - GetDeclarations
+    //----------------------------------------------------------------------------
+
+    member __.FsiGetDeclarations istate (text:string) (names:string[]) =
+        try
+          let tcConfig = TcConfig.Create(tcConfigB,validate=false)
+          Microsoft.FSharp.Compiler.SourceCodeServices.FsiIntelisense.getDeclarations
+            (tcConfig,
+             tcGlobals,
+             tcImports,
+             istate.tcState) 
+            text 
+            names
+        with
+          e ->
+            System.Windows.Forms.MessageBox.Show("FsiGetDeclarations: throws:\n" ^ e.ToString()) |> ignore
+            [| |]
+>>>>>>> Implement proper witness scoping with modules
 
 
 //----------------------------------------------------------------------------

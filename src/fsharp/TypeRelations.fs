@@ -130,25 +130,18 @@ let rec TypeFeasiblySubsumesType ndeep g amap m ty1 canCoerce ty2 =
          end ||
          ty2 |> GetImmediateInterfacesOfType SkipUnrefInterfaces.Yes g amap m 
              |> List.exists (TypeFeasiblySubsumesType (ndeep+1) g amap m ty1 NoCoerce))
-                   
 
+let FindWitness g amap m tcenv (traitTy: TType) =
 
-type WitnessEnv = 
-     | NoWitnessEnv  
-     | WitnessEnv  of NameResolutionEnv * (range -> Typars -> TTypes)
-
-
-let FindWitness g amap m (wenv: WitnessEnv) (traitTy: TType) =
-
-    match wenv with 
-    | NoWitnessEnv -> 
+    match tcenv with 
+    | None -> 
         let typeText = NicePrint.stringOfTy (DisplayEnv.Empty g) traitTy
         errorR(Error(FSComp.SR.tcNoSolutionToTrait2(typeText),m))
         None //errorR(Error(FSComp.SR.typrelCannotResolveImplicitGenericInstantiation((DebugPrint.showType x), (DebugPrint.showType maxSoFar)),m)); maxSoFar
-    | WitnessEnv (nenv,instantiationGenerator) ->  
+    | Some (tcrefs, instantiationGenerator) ->  
 
          let possibilities = 
-            nenv.eTyconsByDemangledNameAndArity.Values
+            tcrefs
             |> Seq.choose (fun witnessTyconRef -> 
             
                  if TyconRefHasAttribute g m g.attrib_WitnessAttribute witnessTyconRef &&
@@ -181,7 +174,7 @@ let FindWitness g amap m (wenv: WitnessEnv) (traitTy: TType) =
 /// variables when compiling patterns at generalized bindings.
 ///     e.g. let ([],x) = ([],[])
 /// Here x gets a generalized type "list<'T>".
-let ChooseTyparSolutionAndRange g amap (wenv: WitnessEnv) (tp:Typar) =
+let ChooseTyparSolutionAndRange g amap (tp:Typar) =
     let m = tp.Range
     let max,m = 
          let initial = 
@@ -200,13 +193,13 @@ let ChooseTyparSolutionAndRange g amap (wenv: WitnessEnv) (tp:Typar) =
              // Don't continue if an error occurred and we set the value eagerly 
              if tp.IsSolved then maxSoFar,m else
              match tpc with 
-             | TyparConstraint.CoercesTo(x,m) -> 
+             | TyparConstraint.CoercesTo(x,m,tcenv) -> 
                  
                  if isAppTy g x && TyconRefHasTraitAttribute g m (tcrefOfAppTy g x) then
 
                     // Traits can't act as solutions, instead we need to find an instance
                     // of the trait to act as a solution.  So go search for one.
-                    let slnOpt = FindWitness g amap m wenv x
+                    let slnOpt = FindWitness g amap m tcenv x
                     match slnOpt with 
                     | Some sln -> join m sln,m
                     | None -> maxSoFar, m // an error has already been reported
@@ -248,7 +241,7 @@ let ChooseTyparSolutionAndRange g amap (wenv: WitnessEnv) (tp:Typar) =
 
 let ChooseTyparSolution g amap tp = 
     // We don't expect to solve any trait constraints for TyChoose expressions, hence use NoWitnessEnv
-    let ty,_m = ChooseTyparSolutionAndRange g amap NoWitnessEnv tp
+    let ty,_m = ChooseTyparSolutionAndRange g amap tp
     if tp.Rigidity = TyparRigidity.Anon && typeEquiv g ty (TType_measure Measure.One) then
         warning(Error(FSComp.SR.csCodeLessGeneric(),tp.Range))
     // We don't expect any required subsumptions (because we are using NoWitnessEnv), so we

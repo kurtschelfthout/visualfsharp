@@ -4463,6 +4463,7 @@ let rec private GetCompletionForItem (ncenv: NameResolver) (nenv: NameResolution
 let IsItemResolvable (ncenv: NameResolver) (nenv: NameResolutionEnv) m ad plid (item: Item) : bool = 
     GetCompletionForItem ncenv nenv m ad plid item |> Seq.exists (ItemsAreEffectivelyEqual ncenv.g item)
 
+
 let GetVisibleNamespacesAndModulesAtPoint (ncenv: NameResolver) (nenv: NameResolutionEnv) m ad =
     let ilTyconNames =
         nenv.TyconsByAccessNames(FullyQualifiedFlag.OpenQualified).Values
@@ -4476,3 +4477,7 @@ let GetVisibleNamespacesAndModulesAtPoint (ncenv: NameResolver) (nenv: NameResol
          IsInterestingModuleName demangledName && notFakeContainerModule ilTyconNames demangledName
          && EntityRefContainsSomethingAccessible ncenv m ad  x
          && not (IsTyconUnseen ad ncenv.g ncenv.amap m x))
+
+type WitnessEnv =
+  | NoWitnessEnv
+  | WitnessEnv  of NameResolutionEnv * (range -> Typars -> TTypes)

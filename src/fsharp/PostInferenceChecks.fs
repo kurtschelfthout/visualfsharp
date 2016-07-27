@@ -256,7 +256,7 @@ and CheckTypesDeep f g env tys = List.iter (CheckTypeDeep f g env) tys
 
 and CheckTypeConstraintDeep f g env x =
      match x with 
-     | TyparConstraint.CoercesTo(ty,_) -> CheckTypeDeep f g env ty
+     | TyparConstraint.CoercesTo(ty,_,_) -> CheckTypeDeep f g env ty
      | TyparConstraint.Associated(ty,_) -> CheckTypeDeep f g env ty
      | TyparConstraint.MayResolveMember(traitInfo,_) -> CheckTraitInfoDeep f g env traitInfo
      | TyparConstraint.DefaultsTo(_,ty,_) -> CheckTypeDeep f g env ty
@@ -979,7 +979,7 @@ and CheckLambdas isTop (memInfo: ValMemberInfo option) cenv env inlined topValIn
                     errorR(Error(FSComp.SR.chkReturnTypeNoByref(), m)))
 
             for tp in tps do 
-                if tp.Constraints |> List.sumBy (function TyparConstraint.CoercesTo(ty,_) when isClassTy cenv.g ty -> 1 | _ -> 0) > 1 then 
+                if tp.Constraints |> List.sumBy (function TyparConstraint.CoercesTo(ty,_,_) when isClassTy cenv.g ty -> 1 | _ -> 0) > 1 then 
                     errorR(Error(FSComp.SR.chkTyparMultipleClassConstraints(), m))
                 
     // This path is for expression bindings that are not actually lambdas

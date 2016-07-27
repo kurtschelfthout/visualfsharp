@@ -277,7 +277,7 @@ type TypeCheckInfo
         // If we're looking for members using a residue, we'd expect only
         // a single item (pick the first one) and we need the residue (which may be "")
         | CNR(_,Item.Types(_,(typ::_)), _, denv, nenv, ad, m)::_, Some _ -> 
-            let items = ResolveCompletionsInType ncenv nenv (ResolveCompletionTargets.All(ConstraintSolver.IsApplicableMethApprox g amap m)) m ad true typ 
+            let items = ResolveCompletionsInType ncenv nenv (ResolveCompletionTargets.All(ConstraintSolver.IsApplicableMethApprox g amap m (MakeWitnessEnv g nenv))) m ad true typ 
             let items = List.map ItemWithNoInst items
             ReturnItemsOfType items g denv m filterCtors hasTextChangedSinceLastTypecheck 
         
@@ -310,7 +310,7 @@ type TypeCheckInfo
                         AccessibleFrom(paths, None)
                 | _ -> ad
 
-              let items = ResolveCompletionsInType ncenv nenv (ResolveCompletionTargets.All(ConstraintSolver.IsApplicableMethApprox g amap m)) m ad false ty
+              let items = ResolveCompletionsInType ncenv nenv (ResolveCompletionTargets.All(ConstraintSolver.IsApplicableMethApprox g amap m (MakeWitnessEnv g nenv))) m ad false ty
               let items = List.map ItemWithNoInst items
               ReturnItemsOfType items g denv m filterCtors hasTextChangedSinceLastTypecheck
         
@@ -454,7 +454,7 @@ type TypeCheckInfo
             match bestQual with
             | Some bestQual ->
                 let (_,typ,denv,nenv,ad,m) = bestQual 
-                let items = ResolveCompletionsInType ncenv nenv (ResolveCompletionTargets.All(ConstraintSolver.IsApplicableMethApprox g amap m)) m ad false typ 
+                let items = ResolveCompletionsInType ncenv nenv (ResolveCompletionTargets.All(ConstraintSolver.IsApplicableMethApprox g amap m (MakeWitnessEnv g nenv))) m ad false typ 
                 let items = items |> List.map ItemWithNoInst
                 let items = items |> RemoveDuplicateItems g
                 let items = items |> RemoveExplicitlySuppressed g
@@ -466,7 +466,7 @@ type TypeCheckInfo
 
     /// Find items in the best naming environment.
     let GetEnvironmentLookupResolutions(nenv, ad, m, plid, filterCtors, showObsolete) = 
-        let items = NameResolution.ResolvePartialLongIdent ncenv nenv (ConstraintSolver.IsApplicableMethApprox g amap m) m ad plid showObsolete
+        let items = NameResolution.ResolvePartialLongIdent ncenv nenv (ConstraintSolver.IsApplicableMethApprox g amap m (MakeWitnessEnv g nenv)) m ad plid showObsolete
         let items = items |> List.map ItemWithNoInst
         let items = items |> RemoveDuplicateItems g 
         let items = items |> RemoveExplicitlySuppressed g

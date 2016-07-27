@@ -483,3 +483,7 @@ val ResolveCompletionsInType       : NameResolver -> NameResolutionEnv -> Resolv
 val GetVisibleNamespacesAndModulesAtPoint : NameResolver -> NameResolutionEnv -> range -> AccessorDomain -> ModuleOrNamespaceRef list
 
 val IsItemResolvable : NameResolver -> NameResolutionEnv -> range -> AccessorDomain -> string list -> Item -> bool
+
+type WitnessEnv =
+  | NoWitnessEnv
+  | WitnessEnv  of NameResolutionEnv * (range -> Typars -> TTypes)

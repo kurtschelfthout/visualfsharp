@@ -204,7 +204,7 @@ let private FoldHierarchyOfTypeAux followInterfaces allowMultiIntfInst skipUnref
                           | TyparConstraint.SimpleChoice _ 
                           | TyparConstraint.Associated _ 
                           | TyparConstraint.RequiresDefaultConstructor _ -> vacc
-                          | TyparConstraint.CoercesTo(cty,_) -> 
+                          | TyparConstraint.CoercesTo(cty,_,_) -> 
                                   loop (ndeep + 1)  cty vacc) 
                         tp.Constraints 
                         state
@@ -300,12 +300,30 @@ let ImportReturnTypeFromMetaData amap m ty scoref tinst minst =
 ///
 /// Note: this now looks identical to constraint instantiation.
 
-let CopyTyparConstraints m tprefInst (tporig:Typar) =
+let UnionTcrefs g tcrefsOrig tcrefs =
+    tcrefsOrig
+    |> List.append (
+        tcrefs
+        |> List.filter (fun tcref1 ->
+            tcrefsOrig
+            |> List.exists (fun tcref2 ->
+                tyconRefEq g tcref1 tcref2)
+            |> not)
+    )
+
+let CopyTyparConstraints g m tprefInst (tporig:Typar) tcenvOpt =
     tporig.Constraints 
     |>  List.map (fun tpc -> 
            match tpc with 
-           | TyparConstraint.CoercesTo(ty,_) -> 
-               TyparConstraint.CoercesTo (instType tprefInst ty,m)
+           | TyparConstraint.CoercesTo(ty,_,tcenvOptOrig) ->
+               let tcenvOptNew =
+                   (match tcenvOpt with
+                    | None -> tcenvOptOrig
+                    | Some(tcrefs, instantiationGenerator) ->
+                       (match tcenvOptOrig with
+                        | None -> tcenvOpt
+                        | Some(tcrefsOrig, _) -> Some(UnionTcrefs g tcrefsOrig tcrefs, instantiationGenerator)))
+               TyparConstraint.CoercesTo (instType tprefInst ty, m, tcenvOptNew)
            | TyparConstraint.Associated(ty,_) -> 
                TyparConstraint.Associated (instType tprefInst ty,m)
            | TyparConstraint.DefaultsTo(priority,ty,_) -> 
@@ -335,7 +353,7 @@ let CopyTyparConstraints m tprefInst (tporig:Typar) =
 
 /// The constraints for each typar copied from another typar can only be fixed up once 
 /// we have generated all the new constraints, e.g. f<A :> List<B>, B :> List<A>> ... 
-let FixupNewTypars m (formalEnclosingTypars:Typars) (tinst: TType list) (tpsorig: Typars) (tps: Typars) =
+let FixupNewTypars g m (formalEnclosingTypars:Typars) (tinst: TType list) (tpsorig: Typars) (tps: Typars) tcenvOpt =
     // Checks.. These are defensive programming against early reported errors.
     let n0 = formalEnclosingTypars.Length
     let n1 = tinst.Length
@@ -347,7 +365,7 @@ let FixupNewTypars m (formalEnclosingTypars:Typars) (tinst: TType list) (tpsorig
     // The real code.. 
     let renaming,tptys = mkTyparToTyparRenaming tpsorig tps
     let tprefInst = mkTyparInst formalEnclosingTypars tinst @ renaming
-    (tpsorig,tps) ||> List.iter2 (fun tporig tp -> tp.FixupConstraints (CopyTyparConstraints  m tprefInst tporig)) 
+    (tpsorig,tps) ||> List.iter2 (fun tporig tp -> tp.FixupConstraints (CopyTyparConstraints g m tprefInst tporig tcenvOpt)) 
     renaming,tptys
 
 
@@ -1445,9 +1463,9 @@ type MethInfo =
             let tcref =  tcrefOfAppTy g x.EnclosingType
             let formalEnclosingTyparsOrig = tcref.Typars(m)
             let formalEnclosingTypars = copyTypars formalEnclosingTyparsOrig
-            let _,formalEnclosingTyparTys = FixupNewTypars m [] [] formalEnclosingTyparsOrig formalEnclosingTypars
+            let _,formalEnclosingTyparTys = FixupNewTypars g m [] [] formalEnclosingTyparsOrig formalEnclosingTypars None
             let formalMethTypars = copyTypars x.FormalMethodTypars
-            let _,formalMethTyparTys = FixupNewTypars m formalEnclosingTypars formalEnclosingTyparTys x.FormalMethodTypars formalMethTypars
+            let _,formalMethTyparTys = FixupNewTypars g m formalEnclosingTypars formalEnclosingTyparTys x.FormalMethodTypars formalMethTypars None
             let formalRetTy, formalParams = 
                 match x with
                 | ILMeth(_,ilminfo,_) -> 

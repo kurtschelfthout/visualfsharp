@@ -1931,9 +1931,9 @@ let main2a(Args (ctok, tcConfig, tcImports, frameworkTcImports: TcImports, tcGlo
     let importMap = tcImports.GetImportMap()
     let metadataVersion = 
         match tcConfig.metadataVersion with
-        | Some v -> v
-        | _ -> match (frameworkTcImports.DllTable.TryFind tcConfig.primaryAssembly.Name) with | Some ib -> ib.RawMetadata.TryGetRawILModule().Value.MetadataVersion | _ -> ""
-    let optimizedImpls, optimizationData, _ = ApplyAllOptimizations (tcConfig, tcGlobals, (LightweightTcValForUsingInBuildMethodCall tcGlobals), outfile, importMap, false, optEnv0, generatedCcu, typedImplFiles)
+        | Some(v) -> v
+        | _ -> match (frameworkTcImports.DllTable.TryFind tcConfig.primaryAssembly.Name) with | Some(ib) -> ib.RawMetadata.TryGetRawILModule().Value.MetadataVersion | _ -> ""
+    let optimizedImpls, optimizationData, _ = ApplyAllOptimizations (tcConfig, tcGlobals, (LightweightTcValForUsingInBuildMethodCall tcGlobals NameResolution.NoWitnessEnv), outfile, importMap, false, optEnv0, generatedCcu, typedAssembly)
 
     AbortOnError(errorLogger, exiter)
         
@@ -1957,10 +1957,9 @@ let main2b (tcImportsCapture,dynamicAssemblyCreator) (Args (ctok, tcConfig: TcCo
         error(Error(FSComp.SR.fscQuotationLiteralsStaticLinking0(), rangeStartup))  
     let staticLinker = StaticLinker.StaticLink (ctok, tcConfig, tcImports, ilGlobals)
 
-    // Generate IL code
-    ReportTime tcConfig "TAST -> IL"
-    use unwindBuildPhase = PushThreadBuildPhaseUntilUnwind BuildPhase.IlxGen
-    let ilxGenerator = CreateIlxAssemblyGenerator (tcConfig, tcImports, tcGlobals, (LightweightTcValForUsingInBuildMethodCall tcGlobals), generatedCcu)
+    ReportTime tcConfig "TAST -> ILX";
+    use unwindBuildPhase = PushThreadBuildPhaseUntilUnwind  BuildPhase.IlxGen
+    let ilxGenerator = CreateIlxAssemblyGenerator (tcConfig, tcImports, tcGlobals, (LightweightTcValForUsingInBuildMethodCall tcGlobals NameResolution.NoWitnessEnv), generatedCcu)
 
     // Check if System.SerializableAttribute exists in mscorlib.dll, 
     // so that make sure the compiler only emits "serializable" bit into IL metadata when it is available.

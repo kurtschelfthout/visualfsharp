@@ -1417,7 +1417,7 @@ let rec u_measure_expr st =
 
 let p_typar_constraint x st = 
     match x with 
-    | TyparConstraint.CoercesTo (a,_)                     -> p_byte 0 st; p_typ a st
+    | TyparConstraint.CoercesTo (a,_,_)                     -> p_byte 0 st; p_typ a st
     | TyparConstraint.MayResolveMember(traitInfo,_) -> p_byte 1 st; p_trait traitInfo st
     | TyparConstraint.DefaultsTo(_,rty,_)                 -> p_byte 2 st; p_typ rty st
     | TyparConstraint.SupportsNull _                          -> p_byte 3 st
@@ -1436,7 +1436,7 @@ let p_typar_constraints = (p_list p_typar_constraint)
 let u_typar_constraint st = 
     let tag = u_byte st
     match tag with
-    | 0 -> u_typ  st             |> (fun a     _ -> TyparConstraint.CoercesTo (a,range0) )
+    | 0 -> u_typ  st             |> (fun a     _ -> TyparConstraint.CoercesTo (a,range0,None) )
     | 1 -> u_trait st            |> (fun a     _ -> TyparConstraint.MayResolveMember(a,range0))
     | 2 -> u_typ st              |> (fun a  ridx -> TyparConstraint.DefaultsTo(ridx,a,range0))
     | 3 ->                          (fun       _ -> TyparConstraint.SupportsNull range0)
