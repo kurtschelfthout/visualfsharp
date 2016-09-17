@@ -25,8 +25,8 @@ This paves the way for the extension of C# (VB, F# etc.) with Haskell style type
 For C#, we call them *concepts*, as a nod to C++ and its (abandoned) but related *concepts*.
 
 For F# we call them *traits* (Don's preference).
----
 
+---
 
 #  Background: Haskell Type Classes
 Haskell's *type classes* are a powerful abstraction mechanism for describing generic algorithms 
@@ -105,20 +105,18 @@ We represent Haskell type classes as Generic interfaces.
 
 ```
 
-C#:
-```csharp
-  interface Eq<A>
-  {
-    bool Equals(A a, A b);
-  }
+F#:
+```fsharp
+ type Eq<'A> = interface 
+     abstract equal: 'A -> 'A -> bool 
+ end
 ```
 
-Concept C#
-```csharp
-  concept Eq<A>
-  {
-    bool Equals(A a, A b);
-  }
+Trait F#
+```fsharp
+ [<Trait>]
+ type Eq<'A> = 
+     abstract equal: 'A -> 'A -> bool 
 ```
 
 
@@ -134,33 +132,25 @@ operations induced by class `Eq a` 's members.
     (==)                    :: (Eq a) => a -> a -> Bool 
 ```
 
-C#
-```csharp
-  static class Overloads {
-    public static bool Equals<EqA, A>(A a, A b) where EqA : struct, Eq<A> => 
-      default(EqA).Equals(a, b);
-  }
+F#
+```fsharp
+ let equal<'A,'EqA when 'EqA : struct and 'EqA :> Eq<'A>> a b = defaultof<'EqA>.equal a b
 ```
 An operation over some class is a static generic method, parameterized by an additional dictionary type parameter (EqA).
 
-Concept C#:
-```csharp
-  static class Overloads {
-    public static bool Equals<A>(A a, A b) where EqA : Eq<A> => 
-      Equals(a,b);
-  }
+Train F#:
+```fsharp
+ let equal a b = Eq.equal a b // dot notation accesses trait members, introduces constraints
 ```
 (drop the instance *parameter*, keep the constraint, loose the `struct`:
  any undeclared - but concept constrained - type parameter is an inferrable instance;
  infer default receiver in instance invokations).
  Instance methods invoked like *static* methods.
 
-
 * Haskell dictionary value ~ C# dictionary type
 
 The dictionary type parameter is marked "struct" (so stack allocated):
-we can access its operations through a default value (no need to pass dictionary values).
-
+we can access its operations through a default value  (no need to pass dictionary values).
 
 ---
 
@@ -179,25 +169,29 @@ A Haskell ground instance, eg.
 
 is translated to a non-generic *struct* implementing the appropriate interface (concept).
  
-```csharp
-  struct EqInt : Eq<int>  {
-    public bool Equals(int a, int b)  => a == b; 
-  }
+```fsharp
+ type EqInt = struct 
+      interface Eq<int> with 
+        member this.equal a b = a = b
+ end 
 
-  struct EqFloat : Eq<float> {
-    public bool Equals(float a, float b)  => a == b;
-  }
+ type EqFloat = struct 
+      interface Eq<float> with 
+        member this.equal a b = a = b
+ end 
 ```
 
-Concept C#:
-```csharp
-  instance EqInt : Eq<int> {
-    public bool Equals(int a, int b)  => a == b; 
-  }
+Trait F#:
+```fsharp
+ [<Witness>] // a.k.a instance
+ type EqInt = 
+      interface Eq<int> with 
+        member equal a b = a = b // no 'this.'
 
-  instance EqFloat : Eq<float> {
-    public bool Equals(float a, float b)  => a == b;
-  }
+ [<Witness>]
+ type EqFloat = 
+      interface Eq<float> with 
+        member equal a b = a = b // no 'this.'
 ```
 
 
@@ -219,33 +213,27 @@ This Haskell code defines, given an equality on type a's (any a) an equality ope
 We can represent a Haskell *parameterized instance* as a *generic struct*, 
 implementing an interface but parameterized by suitably constrained type parameters. 
 
-Substituting, for simplicity, arrays for lists in CS we can write: 
-
-```csharp
-  struct EqArray<A, EqA> : Eq<A[]> where EqA : struct, Eq<A> {
-    public bool Equals(A[] a, A[] b) {
-      if (a == null) return b == null;
-      if (b == null) return false;
-      if (a.Length != b.Length) return false;
-      for (int i = 0; i < a.Length; i++)
-        if default(EqA).Equals(a[i], b[i])) return false;
-      return true;
-    }
-  }
+```fsharp
+type EqList<'A,'EqA when 'EqA : struct and 'EqA :> Eq<'A>> =  struct
+      interface Eq<'A list> with
+        member this.equal a b =  // this unused
+            match a,b with
+            | a::l,b::m -> equal<'A,'EqA> a b && // type arguments reqd!
+                           equal<'A list,EqList<'A,'EqA>> l m
+            | [],[] -> true | _ ,_ -> false
+ end 
 ```
 
-Concept C#:
-```csharp
-  instance EqArray<A> : Eq<A[]> where EqA : Eq<A> {
-     bool Equals(A[] a, A[] b) {
-       if (a == null) return b == null;
-       if (b == null) return false;
-       if (a.Length != b.Length) return false;
-       for (int i = 0; i < a.Length; i++)
-          if Equals(a[i], b[i])) return false;
-       return true;
-      }
-    }
+Trait F#:
+```fsharp
+ [<Witness>]
+ type EqList<'A,'EqA when 'EqA :> Eq<'A>> = // implied constraint 'EqA:struct
+      interface Eq<'A list> with
+        member equal a b = 
+            match a,b with
+            | a::l,b::m -> equal a b && equal l m
+            | [],[] -> true | _ ,_ -> false
+
 ```
 
 # Constructing Evidence
@@ -258,18 +246,14 @@ Derived instances allow Haskell to automatically construct instances as evidence
    [[1],[2,2],[3,3,3]] == [[3,3,3],[2,2],[1]]  -- typechecks!
 ```
 
-In C# `EqInt:Eq<int>` so `EqArray<int,EqInt> : Eq<int[]>` so `EqArray<int[],EqArray<int,EqInt>> : Eq<int[][]>`.
+In F# `EqInt:>Eq<int>` so `EqList<int,EqInt> : Eq<int[]>` so `EqList<int[],EqList<int,EqInt>> : Eq<int[][]>`.
 
 In C#, instance type arguments cannot be inferred from arguments' types. (Why? No occurrences in parameters' types!)
 
-```csharp
+```fsharp
 
-   bool Equals<EqA,A>(A a, A b) where EqA: struct, Eq<A>
-  
-
-   Equals( {{1},{1,2},{1,2,3}}, {{1,2,3},{1,2},{1}} ) // type error
-   
-   Equals< EqArray<int[],EqArray<int,EqInt>>,int[]> , int[][]>( {{1},{1,2},{1,2,3}}, {{1,2,3},{1,2},{1}} ) // typechecks!
+   equal [[1];[2;2];[3;3;3]] [[3;3;3];[2;2];[1]] // type error
+   equal<int list list,EqList<int list,EqList<int,EqInt>>> [[1];[2;2];[3;3;3]] [[3;3;3];[2;2];[1]] // works
 ```
 
 
@@ -278,30 +262,18 @@ In C#, instance type arguments cannot be inferred from arguments' types. (Why? N
 
 No programmer should write this crap!
 
-In Concept C#, we extend type argument inference so:
-* all type and instance arguments can be implicit and inferred from parameter types;
-* type arguments can be explicit and instance type arguments inferred from type arguments ;
-* all type arguments and instance arguments can be explicit (C# fallback option).
+In Trait F#, we extend type argument inference so:
+* so witness type arguments can be implicit and inferred from hierarchy when unamibiguous.
+* all type arguments and instance arguments can be explicit (F# fallback option).
 
-Concept C#:
-```csharp
-
-  bool Equals<A>(A a, A b) where EqA:Eq<A>
-
-
-
-  Equals({{1},{1,2},{1,2,3}},{{1,2,3},{1,2},{1}}) // type checks: instance inferrable from inferred type arguments
-
-  Equals< int[][] >({{1},{1,2},{1,2,3}},{{1,2,3},{1,2},{1}}) // also checks(used when C# type inference fails)
-
-  Equals< int[][], EqArray<int[],EqArray<int,EqInt>> >({{1},{1,2},{1,2,3}},{{1,2,3},{1,2},{1}}) // also checks (used when instance inference fails).
-
-  
-  (bool Equals<A>(A a, A b) where EqA:Eq<A>  ~~ bool Equals<A,[ConceptParameter] EqA>(A a, A b) where EqA:Eq<A>)
+Trait F#:
+```fsharp
+   equal [[1];[2;2];[3;3;3]] [[3;3;3];[2;2];[1]] // type checks (implicitly!)
 ```
 
 Instance type parameters are inferred using type driven backchaining, similar to Haskell.
 
+This is an extension of F#'s existing type constraint solver (ask Don).
 
 ---
 
@@ -318,26 +290,21 @@ For example, equality based list membership in Haskell is defined as follows:
   x `elem` (y:ys)         = x==y || (x `elem` ys)  
 ``` 
 
-In C#, we can define:
-```csharp
-  static bool Elem<EqA, A>(A x, A[] ys) where EqA : struct, Eq<A> {
-      for (int i = 0; i < ys.Length; i++)  {
-        if default(EqA).Equals(x, ys[i])) return true;
-      }
-      return false;
-  }
+In F#, we can encode this as:
+```fsharp
+ let rec elem<'A,'EqA when 'EqA:struct and 'EqA:>Eq<'A>> x ys =
+     match ys with
+     | [] -> false
+     | y::ys -> equal<'A,'EqA> x y && elem x ys
 ```
 
-Concept C#:
-```csharp
-  static bool Elem<A>(A x, A[] ys) where EqA : Eq<A> {
-      for (int i = 0; i < ys.Length; i++) {
-        if (Equals(x, ys[i])) return true;
-      }
-      return false;
-  }
+Trait F#:
+```fsharp
+ let rec elem x ys =
+     match ys with
+     | [] -> false
+     | y::ys -> equal x y && elem x ys
 ```
-
 
 ---
 
@@ -360,37 +327,39 @@ Haskell has a rich numeric hierarchy (think |IArithmetic|)
     ...
 ``` 
 
-C#:
-```csharp
-interface Num<A> {
-    A Add(A a, A b);
-    A Mult(A a, A b);
-    A Neg(A a);
-  }
+F#:
+```fsharp
+   type Num<'A> = interface
+     abstract add: 'A -> 'A ->'A
+     abstract mult: 'A -> 'A ->'A
+     abstract neg: 'A -> 'A
+   end
 
-struct NumInt : Num<int> {
-    public int Add(int a, int b) => a + b; 
-    public int Mult(int a, int b) => a * b; 
-    public int Neg(int a) => -a;
-  }
+   type NumInt = struct
+     interface Num<int> with
+       member this.add a b = a + b
+       member this.mult a b = a + b
+       member this.neg a = -a
+     end
+   end
 ```
 
-Concept C#:
-```csharp
-concept Num<A> {
-    A Add(A a, A b);
-    A Mult(A a, A b);
-    A Neg(A a);
-  }
+Trait F#:
+```fsharp
+   [<Trait>]
+   type Num<'A> = 
+     abstract add: 'A -> 'A ->'A
+     abstract mult: 'A -> 'A ->'A
+     abstract neg: 'A -> 'A
 
-instance NumInt : Num<int> {
-    int Add(int a, int b) => a + b; 
-    int Mult(int a, int b) => a * b; 
-    int Neg(int a) => -a;
-  }
+   [<Witness>]
+   type NumInt = 
+     interface Num<int> with
+       member add a b = a + b
+       member mult a b = a + b
+       member neg a = -a
+     end
 ```
-
-
 ---
 
 
@@ -407,44 +376,49 @@ Haskell supports (multiple) inheritance of super classes.
 
 * Forall types `a`, `Num a` derives from `Eq a`. (Is it just me or is Haskell's `=>` the wrong-way round?).
 
-In C#, we instead use (multiple) interface inheritance C#:
-```csharp
-  interface Num<A> : Eq<A> {
-    A Add(A a, A b);
-    A Mult(A a, A b);
-    A Neg(A a);
-  }
-  struct NumInt : Num<int> {
-    public bool Equals(int a, int b) => default(EqInt).Equals(a, b);
-    public int Add(int a, int b) => a + b;
-    public int Mult(int a, int b) => a * b; 
-    public int Neg(int a) => -a;
-  }
+In F#, we instead use ordinary (multiple) interface inheritance:
+```fsharp
+ type Num<'A> = interface
+     inherit Eq<'A>
+     abstract add: 'A -> 'A ->'A
+     abstract mult: 'A -> 'A ->'A
+     abstract neg: 'A -> 'A
+ end
+
+ type NumInt = struct
+     interface Num<int> with
+       member this.equal a b = equal<int,EqInt> a b // named instance!
+       member this.add a b = a + b
+       member this.mult a b  = a + b
+       member this.neg a = -a 
+     end
+ end
 ```
 
-Concept C#:
-```csharp
-  concept Num<A> : Eq<A> {
-    A Add(A a, A b);
-    A Mult(A a, A b);
-    A Neg(A a);
-  }
-  instance NumInt : Num<int> {
-    bool Equals(int a, int b) => EqInt.Equals(a, b); // named instance useful here.
-    int Add(int a, int b) => a + b;
-    int Mult(int a, int b) => a * b; 
-    int Neg(int a) => -a;
-  }
+Trait F#:
+```fsharp
+ [<Trait>]
+ type Num<'A> = 
+     inherit Eq<'A>
+     abstract add: 'A -> 'A ->'A
+     abstract mult: 'A -> 'A ->'A
+     abstract neg: 'A -> 'A
+
+ [<Witness>]
+ type NumInt = 
+     interface Num<int> with
+       member equal a b = equal<_,EqInt> a b 
+       member add a b = a + b
+       member mult a b  = a + b
+       member neg a = -a 
+     end
 ```
 
-* Haskell class inheritance ~ C# interface inheritance 
-
+* Haskell class inheritance ~ F# interface inheritance 
 
 ---
 
-
 #  Subsumption
-
 
 Subsumption allows one to derive (evidence for) a class from (evidence for) its subclasses.
 
@@ -463,48 +437,37 @@ Subsumption allows one to derive (evidence for) a class from (evidence for) its 
                      '      
 ```
 
-C#:
-```csharp
-    static bool Equals<EqA, A>(A a, A b) where EqA : struct, Eq<A> 
-        => default(EqA).Equals(a, b);
+F#:
+```fsharp
+ let square<'A,'NumA when 'NumA:struct and 'NumA:>Num<'A>> x =
+     defaultof<'NumA>.mult x x
 
-    static A Square<NumA, A>(A a) where NumA : struct, Num<A> 
-        => default(NumA).Mult(a, a);
-    
-    static bool MemSq<NumA, A>(A[] a_s, A a) where NumA : struct, Num<A> {
-      for (int i = 0; i < a_s.Length; i++) {
-        if (Equals<NumA, A>(a_s[i], Square<NumA, A>(a))) return true;
-               /*  ^^^^ legal only because NumA : Num<A> : Eq<A> */
-      }
-      return false;
-    }
+ let rec memsq<'A,'NumA when 'NumA:struct and 'NumA:>Num<'A>> n a = 
+       match n with
+       | [] -> false
+       | (h::t) -> equal<'A,'NumA> h (square<'A,'NumA> a)
+                   (*         ^^^^ legal coz NumA :> Num<'A> :> Eq<'A> *)
+                  || memsq<'A,'NumA> n a
 ```
 
-Concept C#:
-```csharp
-    static bool Equals<A>(A a, A b) where EqA : Eq<A> =>
-      Equals(a, b);
+Trait F#:
+```fsharp
+ let square x = Num.mult x x
 
-    static A Square<A>(A a) where NumA : Num<A> =>
-      Mult(a, a);
-
-    static bool MemSq<NumA, A>(A[] a_s, A a) where NumA : Num<A> {
-      for (int i = 0; i < a_s.Length; i++) {
-        if (Equals(a_s[i], Square(a))) return true;
-               /*  ^^^^ legal only because (implicitly) NumA : Num<A> : Eq<A> */
-      }
-      return false;
-    }
+ let rec memsq n a = 
+       match n with
+       | [] -> false
+       | (h::t) -> equal h (square a) || memsq n a
 ```
 
 
 ---
 
 
-#  Classy QuickSort
+#  Classy QuickSort 
 
 C#:
-```csharp
+```fsharp
     // Polymorphic OO-style quicksort: general, typesafe
     // Note the type parameter bound in the generic method
 
@@ -530,7 +493,7 @@ C#:
 ```
 
 Concept C#:
-```csharp
+```fsharp
     public static void qsort<T>(T[] arr, int a, int b)
       where IOrdT : IOrd<T> { 
       // sort arr[a..b]			   
@@ -567,14 +530,14 @@ Concept C#:
 # Disassembly
 
 C#:
-```csharp
+```fsharp
 public static bool Equals<EqA,A>(A a, A b) 
                      where EqA : struct, Eq<A>
        => default(EqA).Equals(a, b);
 ```
 
 Concept C#:
-```csharp
+```fsharp
 public static bool Equals<A>(A a, A b) 
                      where EqA : Eq<A>
        => Equals(a, b);
@@ -613,32 +576,29 @@ IL:
 
 # Summary
 
-| Haskell | C#| Concept C# |
+
+| Haskell | F#| Train F# |
 ----------|--------|--------
-|type class	| generic interface| generic concept 
-|instance	| struct           | instance
-|derived instance | generic struct | generic instance
-|type class inheritance	| interface inheritance | concept inheritance
-|overloaded operation | constrained generic method | generic method with implicit type parameters
-|implicit dictionary construction | explicit type construction | implicit instance construction with explicit fallback
-|implicit dictionary passing | explicit type passing | implicit type passing with explicit fallback
-|constraint inference & propagation | NA | NA
-
-
+|type class	| generic interface| trait 
+|(anonymous) instance	| (named) struct  | (named) witness
+|derived instance | generic struct | generic witness
+|type class inheritance	| interface inheritance | trait inheritance
+|overloaded operation | constrained generic value | constrained generic value
+|implicit dictionary construction | explicit type construction | implicit type construction
+|implicit dictionary passing | explicit type passing | implicit type passing 
+|constraint inference & propagation | constraint checking | extended constraint solving 
 ---
 
 
 #  Syntactic Support
 
-* Distinguish type class declarations (new keyword concept)
+* Distinguish type class declarations (new attribute [<Trait>])
 * Anonymize instance declarations (new keyword instance)
 * Add semi-implicit dictionary type abstraction (induced by concept constraints)
 * Add implicit dictionary type instantiation (by extending type argument inference)
 
-
-
 ---
--
+
 
 #  Anonymous classes, instances constraitns
 
@@ -648,7 +608,7 @@ In Haskell, instances and constraints (but not type classes) are *anonymous*:
 * evidence is always unique (by construction and imposed rules). 
 
 Concept C#:
-```csharp
+```fsharp
   instance EqInt : Eq<int> {
     bool Equals(int a, int b) => a == b;
   }
@@ -667,7 +627,7 @@ Concept C#:
 We *could* do something similar:
 
 Concept C# with implicit instances:
-```csharp
+```fsharp
   instance Eq<int> {
     bool Equals(int a, int b) => a == b;
   }
@@ -687,27 +647,23 @@ More concise, but less flexiblee, and probably a bad idea, given C#'s limited ty
 
 #  Implementation Status
 
-* working compiler 
+* working compilers for C# and F#
 * separate compilation via trivial attributes recognized on imports, emitted on export.
-* syntax for named concepts, named instance and named concept constraints.
+* C# syntax for named concepts, named instance and named concept constraints.
 * concept parameters must be invariant.
 * extended type argument inference to resolve concepts to instances 
   (simple backchaining, exploiting Roslyn's type unification algorithm to find instantiations).
+* C# operators (+/- etc.) in concepts with extended operator resolution (just sugar, but important sugar).
 
 Future:
 * Associated types (concepts with abstract type components; compiled to additional parameters).
 * Anonymous concepts, instance and constraints - not convinced this is a good idea for C#.
   * sans names, it's impossible to be explicit when C# type inference fails.
-* C# operators (+/- etc.) in concepts with extended operator resolution (just sugar, but important sugar).
 * Currently, different type instantiations, though all type safe, can produce different semantics.
   * adopt Haskell like restrictions to force coherence; or
   * disambiguate with ad-hoc *betterness* rules.
 * Decidability of constrain solving.
 * Allow & exploit variance (no such thing in Haskell).
-
-Concepts for F# (allowing constraint inference and propagation like Haskell).
-
-
 ---
 
 
@@ -718,7 +674,7 @@ Concepts for F# (allowing constraint inference and propagation like Haskell).
 * Concept C# rendition of Haskell Prelude, including numeric tower (think BCL)
 * Generic QuickHull (one convex hull algorithm for generic vector spaces)
 * Generic Graph Library - Haskell used to trump C#, does it still?
-* IArithmetic
+* C#,F# Numeric towers (haskell prelude)
 * Generic Interface to System.Numerics.Vector2D/Vector3D/Vector4D (see QuickHull)
 * THIS SPACE FOR RENT
 
@@ -743,7 +699,7 @@ Concepts for F# (allowing constraint inference and propagation like Haskell).
 #  Links & References
 
 
-This document https://github.com/CaptainHayashi/roslyn/blob/master/concepts/docs/concepts.md.
+C# version of this document https://github.com/CaptainHayashi/roslyn/blob/master/concepts/docs/concepts.md.
 
 Roslyn fork: https://github.com/CaptainHayashi/roslyn.
 

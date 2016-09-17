@@ -6,6 +6,7 @@ module Test
      abstract equal: 'A -> 'A -> bool 
 
  let equal a b = Eq.equal a b
+ let equal' = Eq.equal
 
  [<Witness>]
  type EqInt = 
@@ -20,7 +21,7 @@ module Test
  [<Witness>]
  type EqList<'A,'EqA when 'EqA :> Eq<'A>> = // implied 'EqA:struct
       interface Eq<'A list> with
-        member this.equal a b = 
+        member equal a b = 
             match a,b with
             | a::l,b::m -> equal a b && 
                            equal l m

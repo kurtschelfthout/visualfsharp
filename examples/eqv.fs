@@ -16,7 +16,7 @@ module Test =
  end 
 
  
- let eq = Eq.equals
+ let eq = Eq.equals 
 
  let test() = 
     let t0 = Eq.equals 1 1
