@@ -134,13 +134,15 @@ operations induced by class `Eq a` 's members.
 
 F#
 ```fsharp
- let equal<'A,'EqA when 'EqA : struct and 'EqA :> Eq<'A>> a b = defaultof<'EqA>.equal a b
+ let equal<'A,'EqA when 'EqA : struct and 'EqA :> Eq<'A>> a b =
+       defaultof<'EqA>.equal a b
 ```
 An operation over some class is a static generic method, parameterized by an additional dictionary type parameter (EqA).
 
-Train F#:
+Trait F#:
 ```fsharp
- let equal a b = Eq.equal a b // dot notation accesses trait members, introduces constraints
+ let equal a b = Eq.equal a b // dot notation for trait members
+                              // introduces constraints
 ```
 (drop the instance *parameter*, keep the constraint, loose the `struct`:
  any undeclared - but concept constrained - type parameter is an inferrable instance;
@@ -577,7 +579,7 @@ IL:
 # Summary
 
 
-| Haskell | F#| Train F# |
+| Haskell | F#| Trait F# |
 ----------|--------|--------
 |type class	| generic interface| trait 
 |(anonymous) instance	| (named) struct  | (named) witness
@@ -662,7 +664,7 @@ Future:
 * Currently, different type instantiations, though all type safe, can produce different semantics.
   * adopt Haskell like restrictions to force coherence; or
   * disambiguate with ad-hoc *betterness* rules.
-* Decidability of constrain solving.
+* Decidability of constraint solving.
 * Allow & exploit variance (no such thing in Haskell).
 ---
 
