@@ -59,3 +59,10 @@ code {
 	display: block;
 	padding: 0.5em;
 }
+
+/*
+img[alt=x86] { height: 100px;}
+img[alt=perf] { height: 100px;}
+img[alt=staticinterfaces] { height: 100px;}
+img[alt=comparison] { height: 100px;}
+*/
