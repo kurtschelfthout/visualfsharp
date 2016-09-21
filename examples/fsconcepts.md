@@ -6,25 +6,29 @@ Claudio Russo, Matt Windsor, Don Syme, James Clarke, Rupert Horlick
 
 ---
 
-## Abstract:
-
+## Introduction
 
 Type classes are an immensely popular and productive feature of Haskell.
 
-*Really!*
+Other languages have stolen them (Rust *traits*, Scala *implicits*, Swift *protocols*, ~C++ concepts~, ...).
 
-It turns out that they have a natural and efficient representation in .NET that is:
+--
+
+But not F# or C#.
+
+-- 
+This talk:
+
+We add type classes to F# (and C#) using a coding trick that is
 * type preserving (no yucky erasure)
-* efficient (exploits Generic's USP: run-time code specialiation)
-* essentially free (zero CLR changes required)
-
-Our encoding provides safe and optional cross-language interoperation.
-
-This paves the way for the extension of C#, F# etc. with Haskell style type classes. 
+* efficient (with run-time code specialiation)
+* essentially free (zero VM modifications required)
 
 For C#, we call them *concepts*, as a nod to C++ *concepts*.
 
 For F#, we call them *traits* (Don's preference).
+
+Both have been implemented as OS prototypes.
 
 ---
 
@@ -98,7 +102,7 @@ It's *sound by construction*.
 
 ##  Haskell Type Classes
  
-We represent Haskell type classes as Generic interfaces.
+We represent Haskell type classes as generic interfaces.
 
 ```Haskell
   class Eq a where 
@@ -139,7 +143,7 @@ In F#, an overload  is just a generic function, parameterized by an additional d
 
 The dictionary type parameter `'EqA` is:
 * constrained to be a `struct` (a stack allocated type); 
-* bounded by its interface ('EqA: Eq<'A>)
+* bounded by its interface (`'EqA: Eq<'A>`)
 
 > *Haskell dictionary value ~ F# dictionary type*
 
@@ -460,9 +464,140 @@ IL:
 
 ![x86](./images/x86.png)
 
+---
+
+
+```csharp
+        T ConceptGenericOpt<T, NumT>() where NumT : struct, Num<T> {
+            System.Diagnostics.Debugger.Break();
+            NumT NI = default(NumT);
+            T y = NI.FromInteger(0);
+            T c = NI.FromInteger(666);
+            for (int i = 0; i < n; i++) {
+                T x = NI.FromInteger(i);
+                y = NI.Plus(NI.Plus(NI.Mult(x,x),x), c);
+            }
+            return y;
+        }
+```
+
+x86 (Release Mode)
+```masm
+00007FF9B5820D4B  call        00007FFA09A148C0  
+00007FF9B5820D50  mov         byte ptr [rsp+20h],0  
+00007FF9B5820D55  xor         eax,eax  
+00007FF9B5820D57  xor         edx,edx  
+00007FF9B5820D59  mov         ecx,dword ptr [7FF9B5704884h]  
+00007FF9B5820D5F  test        ecx,ecx  
+00007FF9B5820D61  jle         00007FF9B5820D75  
+00007FF9B5820D63  mov         eax,edx  
+00007FF9B5820D65  imul        eax,edx  
+00007FF9B5820D68  add         eax,edx  
+00007FF9B5820D6A  add         eax,29Ah  
+00007FF9B5820D6F  inc         edx  
+00007FF9B5820D71  cmp         edx,ecx  
+00007FF9B5820D73  jl          00007FF9B5820D63  
+00007FF9B5820D75  add         rsp,28h  
+00007FF9B5820D79  ret  
+```
 
 ---
 
+```masm
+--- C:\concepts\roslyn\concepts\conceptbench\conceptbench\Program.cs -----------
+        T ConceptGenericOpt<T, NumT>() where NumT : struct, Num<T> {
+...
+            System.Diagnostics.Debugger.Break();
+030E37CB  call        735E4558  
+030E37D0  nop  
+            NumT NI = default(NumT);
+030E37D1  lea         eax,[ebp-40h]  
+030E37D4  mov         byte ptr [eax],0  
+            T y = NI.FromInteger(0);
+030E37D7  lea         ecx,[ebp-40h]  
+030E37DA  xor         edx,edx  
+030E37DC  call        030E31B8  
+030E37E1  mov         dword ptr [ebp-5Ch],eax  
+030E37E4  mov         eax,dword ptr [ebp-5Ch]  
+030E37E7  mov         dword ptr [ebp-44h],eax  
+            T c = NI.FromInteger(666);
+030E37EA  lea         ecx,[ebp-40h]  
+            T c = NI.FromInteger(666);
+030E37ED  mov         edx,29Ah  
+030E37F2  call        030E31B8  
+030E37F7  mov         dword ptr [ebp-60h],eax  
+030E37FA  mov         eax,dword ptr [ebp-60h]  
+030E37FD  mov         dword ptr [ebp-48h],eax  
+            for (int i = 0; i < n; i++) {
+030E3800  xor         edx,edx  
+030E3802  mov         dword ptr [ebp-4Ch],edx  
+030E3805  nop  
+030E3806  jmp         030E3866  
+030E3808  nop  
+                T x = NI.FromInteger(i);
+030E3809  lea         ecx,[ebp-40h]  
+030E380C  mov         edx,dword ptr [ebp-4Ch]  
+030E380F  call        030E31B8  
+030E3814  mov         dword ptr [ebp-64h],eax  
+030E3817  mov         eax,dword ptr [ebp-64h]  
+030E381A  mov         dword ptr [ebp-50h],eax  
+                y = NI.Plus(NI.Plus(NI.Mult(x,x),x), c);
+030E381D  lea         eax,[ebp-40h]  
+030E3820  mov         dword ptr [ebp-68h],eax  
+030E3823  lea         eax,[ebp-40h]  
+030E3826  mov         dword ptr [ebp-6Ch],eax  
+030E3829  push        dword ptr [ebp-50h]  
+030E382C  lea         ecx,[ebp-40h]  
+030E382F  mov         edx,dword ptr [ebp-50h]  
+030E3832  call        030E31C8  
+030E3837  mov         dword ptr [ebp-70h],eax  
+030E383A  push        dword ptr [ebp-50h]  
+030E383D  mov         ecx,dword ptr [ebp-6Ch]  
+030E3840  mov         edx,dword ptr [ebp-70h]  
+030E3843  call        030E31D8  
+                y = NI.Plus(NI.Plus(NI.Mult(x,x),x), c);
+030E3848  mov         dword ptr [ebp-74h],eax  
+030E384B  push        dword ptr [ebp-48h]  
+030E384E  mov         ecx,dword ptr [ebp-68h]  
+030E3851  mov         edx,dword ptr [ebp-74h]  
+030E3854  call        030E31D8  
+030E3859  mov         dword ptr [ebp-78h],eax  
+030E385C  mov         eax,dword ptr [ebp-78h]  
+030E385F  mov         dword ptr [ebp-44h],eax  
+            }
+030E3862  nop  
+            for (int i = 0; i < n; i++) {
+030E3863  inc         dword ptr [ebp-4Ch]  
+030E3866  mov         eax,dword ptr [ebp-4Ch]  
+030E3869  cmp         eax,dword ptr ds:[5F4051Ch]  
+030E386F  setl        al  
+030E3872  movzx       eax,al  
+030E3875  mov         dword ptr [ebp-54h],eax  
+030E3878  cmp         dword ptr [ebp-54h],0  
+030E387C  jne         030E3808  
+            return y;
+030E387E  mov         eax,dword ptr [ebp-44h]  
+030E3881  mov         dword ptr [ebp-58h],eax  
+030E3884  nop  
+030E3885  jmp         030E3887  
+        }
+030E3887  mov         eax,dword ptr [ebp-58h]  
+030E388A  lea         esp,[ebp-0Ch]  
+030E388D  pop         ebx  
+030E388E  pop         esi  
+030E388F  pop         edi  
+030E3890  pop         ebp  
+030E3891  ret  
+```
+---
+
+![x86](./images/bench/Slide1.png)
+
+---
+
+![x86](./images/bench/Slide2.png)
+
+---
 
 ## Summary
 
