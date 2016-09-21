@@ -6,91 +6,7 @@ Claudio Russo, Matt Windsor, Don Syme, James Clarke, Rupert Horlick
 
 ---
 
-## Introduction
-
-Type classes are an immensely popular and productive feature of Haskell.
-
-Other languages have stolen them (Rust *traits*, Scala *implicits*, Swift *protocols*, ~C++ concepts~, ...).
-
---
-
-But not F# or C#.
-
--- 
-This talk:
-
-We add type classes to F# (and C#) using a coding trick that is
-* type preserving (no yucky erasure)
-* efficient (with run-time code specialiation)
-* essentially free (zero VM modifications required)
-
-For C#, we call them *concepts*, as a nod to C++ *concepts*.
-
-For F#, we call them *traits* (Don's preference).
-
-Both have been implemented as OS prototypes.
-
----
-
-##  Background: Haskell Type Classes
-
-Haskell's *type classes* are a powerful abstraction mechanism for describing generic algorithms 
-applicable to types that have distinct representations but common interfaces.
-
-* A *type class* is a predicate on types that specifies a set of required operations by their type signatures.
-* A *class instance* declares membership of an existing type in a class by providing 
-  implementations for each of the class' operations.
-* Type classes may be arranged hierarchically, permitting *inheritance* and *subsumption*. 
-* Class instances may be generic, describing whole families of instances, predicated on type class membership.
-
-
----
-
-
-## Why should .NET care?
-
-Unlike OO interfaces:
-
-* Instance declarations are decoupled from their associated types, allowing post-hoc interface ascription.
-* Adding a concept to a framework type requires zero changes to the framework itself.
-* Any operation in a type class can have a default implementation, allowing class instances to omit or override the default.
-* A (much) cheaper yet efficient alternative to CLR += "static interfaces methods".
-
-
----
-
-##  Why didn't we do this before?
-
-Times have changed: classes aren't just a Haskell features anymore ...
-*	Swift *protocols*
-*	Scala *implicits* 
-*	Rust	*traits*	
-*	Go structural interfaces 
-*	Academic proposals: JavaGI, Static Interface Methods for the CLR
-*	Isabelle, Coq, LEAN (theorem provers)
-*	~~C++ concepts~~
-*	...
-
-
----
-
-
-##  Compare with: "Static Interface Methods for the CLR"
-
-Why wasn't this adopted?
-*  Cost: Required CLR & BCL changes
-* (soundness issues)
-
-This approach requires *no* changes to CLR or BCL (compiler changes + conventions only).
-It's *sound by construction*.
-
-![staticinterfaces](./images/staticinterfaces.png)
-
-
----
-
-
-##  Haskell comes top! 
+##  Haskell trumps ML! 
 
 ![comparison](./images/comparison.png)
 
@@ -100,16 +16,83 @@ It's *sound by construction*.
 
 ---
 
+## Introduction
+
+Type classes are an immensely popular and productive feature of Haskell.
+
+(Almost as good as modules, sometimes better!)
+
+So good, other languages have stolen them:
+ * ~~C++ concepts~~ (for perf!)
+ * Scala *implicits*
+ * Rust *traits* 
+ * Swift *protocols*
+ * Coq (2 variants),Agda, Clean....
+
+--
+
+But not F# or C#.
+
+--
+
+![wecandoit](./images/wecandoit.png)
+
+---
+##This talk:
+
+We add type classes to F# using a cheap coding trick that is
+
+* type preserving (no yucky erasure)
+* efficient (thanks to .NET's run-time code specialiation)
+* essentially free (zero VM modifications required)
+* modular
+
+For F#, we call type classes *traits* (Don's preference).
+
+The same technique works interoperably for C# etc. 
+
+*Trait F#* and *Concept C#* are implemented as open source prototypes.
+
+---
+
+##  Recap: Haskell Type Classes
+
+Type classes are an abstraction mechanism for describing generic algorithms.
+
+A *type class* is a predicate on types that specifies a set of required operations by signature.
+
+A *class instance* declares class membership of a type by implementing each operation.
+
+Type classes form hierarchies with *inheritance* and *subsumption*. 
+
+A *generic instance* defines *families* of instances, predicated on class membership.
+
+...
+
+
+
+### Why should .NET care?
+
+Instance declarations are decoupled from their types (unlike interfaces).
+
+Type classes can have less overhead than OO abstractions. Even zero overhead.
+
+Type classes allow efficient abstraction over numeric types (sorely missing in .NET).
+
+---
+background-image: url(./images/cheaptrick.jpg)
+---
+
 ##  Haskell Type Classes
  
-We represent Haskell type classes as generic interfaces.
+We represent a Haskell type class, e.g.
 
 ```Haskell
   class Eq a where 
-    (==)                  :: a -> a -> Bool
+    (==) :: a -> a -> Bool
 ```
 
-F#:
+as a *generic* F# interface:
 ```fsharp
  type Eq<'A> = interface 
      abstract equal: 'A -> 'A -> bool 
@@ -127,39 +110,58 @@ Trait F#
 
 ## Haskell Overloads
 
-The Haskell declaration of class `Eq a` implicitly declares the overloaded 
-operation(s) induced by class `Eq a` 's members.
+The Haskell declaration of class `Eq a` implicitly declares the overload:
 
 ```Haskell
-    (==)                    :: (Eq a) => a -> a -> Bool 
+    (==) :: (Eq a) => a -> a -> Bool  -- note the added constraint!
 ```
 
-In F#, an overload  is just a generic function, parameterized by an additional dictionary type parameter `'EqA`.
+In F#, an overload  can be encoded as a generic function, parameterized by an additional type parameter `'EqA`.
 
 ```fsharp
  let equal<'A,'EqA when 'EqA : struct and 'EqA :> Eq<'A>> a b =
        defaultof<'EqA>.equal a b
 ```
 
-The dictionary type parameter `'EqA` is:
-* constrained to be a `struct` (a stack allocated type); 
-* bounded by its interface (`'EqA: Eq<'A>`)
+The ordinary type parameter `'EqA` is:
+* constrained to be a `struct` (allocable on the stack); 
+* bounded by its interface (`'EqA: Eq<'A>`);
+* a named *witness* for the constraint `Eq<'A>`.
 
-> *Haskell dictionary value ~ F# dictionary type*
+(think `equal`: `forall 'A, 'EqA <: Eq<'A>. 'A -> 'A -> bool`)
 
-Passing a dictionary as a type (not value) is enough: we can always access the dictionary's operation(s) by allocating a default value. Stack allocation is cheap.
+
+> *Haskell dictionary value ~ F# witness type*
 
 ---
 
-That's gross, so in Trait F#, we extend the dot notation to access overloads: 
+## Zooming in
+
+Look closely:
+
+```fsharp
+ let equal<'A,'EqA when 'EqA : struct and 'EqA :> Eq<'A>> a b =
+       defaultof<'EqA>.equal a b
+```
+
+Where is the *value* parameter for the "dictionary" that GHC would insert?
+
+--
+
+We don't need one!
+
+In F#, primitive `defaultof<T>` has type `T` and returns a default value.
+
+Using `defaultof<T>`, we can create dictionary values on demand, when required for calls.
+
+Doing so explicitly is gross, so in Trait F#, we extend the dot notation to access overloads:
 
 ```fsharp
  let equal a b = Eq.equal a b // dot notation for trait members
-                              // introduces constraints
+                              // introduces constraints 
 ```
 
-
-
+(The `struct` constraints ensure dictionary values are never 'null'; no call can fail.)
 
 ---
 
@@ -173,7 +175,7 @@ A Haskell ground instance, eg.
     x == y                =  x `integerEq` y
 ```
 
-is translated to a *struct* implementing a trait (i.e. interface).
+is translated to an F# *struct* implementing a trait (i.e. interface).
  
 ```fsharp
  type EqInt = struct 
@@ -183,6 +185,8 @@ is translated to a *struct* implementing a trait (i.e. interface).
 ...
 ```
 
+The struct is empty (think `unit`) but (!) has associated code.
+
 Trait F#:
 ```fsharp
  [<Witness>] // a.k.a instance
@@ -191,14 +195,12 @@ Trait F#:
         member equal a b = a = b // no 'this.'
 ...
 ```
-
-
 ---
 
 
-##  Derived Instances...
+##  Generic Instances...
 
-Derived instances define *families* of instances.
+Haskells generic instances define *families* of instances.
 
 E.g. 
 
@@ -214,7 +216,7 @@ on *lists* of `a` (written `[a]`):
 
 ---
 
-## ...Derived Instances
+## ...Generic Instances
 
 We can represent a Haskell *parameterized instance* as a *generic struct*, 
 implementing an interface but parameterized by suitably constrained type parameters. 
@@ -256,7 +258,7 @@ Derived instances allow Haskell to automatically construct instances as evidence
 
 In F# `EqInt:>Eq<int>` so `EqList<int,EqInt> :> Eq<int list>` so `EqList<int list,EqList<int,EqInt>> :> Eq<int list list>`.
 
-In F#, instance type arguments cannot be inferred from arguments' types. (Why? No occurrences in parameters' types!)
+In F#, dictionary type arguments cannot be inferred... they usually don't occur elsewhere in the type!
 
 ```fsharp
    equal [[1];[2;2];[3;3;3]] [[3;3;3];[2;2];[1]] // type error
@@ -265,31 +267,31 @@ In F#, instance type arguments cannot be inferred from arguments' types. (Why? N
    	 [[1];[2;2];[3;3;3]] [[3;3;3];[2;2];[1]] // works
 ```
 
+Programming in the encoding requires explicit type abstraction and instantiation.
+
 ---
 
 ## Instance Inference
 
 No programmer should write this crap!
 
-In Trait F#, we extend type argument inference so:
-
-* so witness type arguments are inferred from trait hierarchy.
+In Trait F#, we extend inference so witness type arguments are derived from the trait hierarchy.
 
 Trait F#:
 ```fsharp
    equal [[1];[2;2];[3;3;3]] [[3;3;3];[2;2];[1]] // type checks! 
 ```
 
-Instance type parameters are inferred using type driven backchaining, similar to Haskell.
+Witness are inferred using type driven backchaining, similar to Haskell.
 
-This is an extension of F#'s existing type constraint solver (ask Don).
+This is an extension of F#'s existing type constraint solver (Don's the man).
 
 ---
 
 
 ##  Derived Operations 
 
-We translate Haskell's qualified types as extra type parameters, constrained to be both structs and bound by translations of their type class constraints.
+We translate Haskell's qualified types as extra, bounded type parameters denoting witness parameters.
 
 For example, equality based list membership in Haskell is defined as follows:
 
@@ -417,73 +419,78 @@ Trait F#:
 
 ---
 
-
-## Disassembly
-
-C#:
-```fsharp
-public static bool Equals<EqA,A>(A a, A b) 
-                     where EqA : struct, Eq<A>
-       => default(EqA).Equals(a, b);
-```
-
-Concept C#:
-```fsharp
-public static bool Equals<A>(A a, A b) 
-                     where EqA : Eq<A>
-       => Equals(a, b);
-```
+## MSIL ByteCode
 
 IL:
-```
+```cil
 .method public hidebysig static bool
-    Equals<valuetype .ctor([mscorlib]System.ValueType, class Eq.Eq`1<!!A>) EqA, A> 
-                       // dictionary EqA is a type (not value) parameter   ^^^
-        (!!A a,!!A b) 
+    Equals< A, 
+    	    valuetype .ctor([mscorlib]System.ValueType, class Eq.Eq`1<!!A>) EqA> 
+   (!!A a,!!A b) 
    cil managed {
    .locals init ([0] !!EqA loc1,[1] !!EqA loc2)
-   IL_0000: ldloca.s loc1  // stack allocation of default struct (actually an empty token)
-   IL_0002: initobj !!EqA 
-   IL_0008: ldloc.0
-   IL_0009: stloc.1
-   IL_000a: ldloca.s loc2
-   IL_000c: ldarg.0
-   IL_000d: ldarg.1
-   IL_000e: constrained. !!EqA  
-   IL_0014: callvirt instance //a direct call to an interface method on that struct
-              bool class Eq.Eq`1<!!A>::Equals(!0, !0) 
-   IL_0019: ret
+   ldloca.s loc1  // stack allocate dictionary
+   initobj !!EqA 
+   ldloc.0
+   stloc.1
+   ldloca.s loc2
+   ldarg.0
+   ldarg.1
+   constrained. !!EqA
+   callvirt instance bool class Eq.Eq`1<!!A>::Equals(!0, !0) 
+   ret
 }
-
 ```
+The `callvirt` instruction is typically used for an indirect call to a virtual method.
+
+When `EqA` is a struct, due to specialization, the callee is always known and often inlined.
 
 ---
 
-##  Machine Code
 
+### Performance
 
-![x86](./images/x86.png)
+Evaluating a polynomial `f(x:T) = x*x + x + (T)666` (in C#), 
 
----
+where `T`=`int`, `double`, `Class3D`, `Struct3D`.
 
+(We evaluate `f(x)` at `1m` values of `x` using the BenchmarkDotNet harness.)
 
 ```csharp
-        T ConceptGenericOpt<T, NumT>() where NumT : struct, Num<T> {
-            System.Diagnostics.Debugger.Break();
-            NumT NI = default(NumT);
-            T y = NI.FromInteger(0);
-            T c = NI.FromInteger(666);
-            for (int i = 0; i < n; i++) {
-                T x = NI.FromInteger(i);
-                y = NI.Plus(NI.Plus(NI.Mult(x,x),x), c);
-            }
-            return y;
-        }
+    T ConceptGenericOpt<T, NumT>() where NumT : struct, Num<T> {
+       NumT NI = default(NumT);
+       T y = NI.FromInteger(0);
+       T c = NI.FromInteger(666);
+       for (int i = 0; i < n; i++) {
+          T x = NI.FromInteger(i);
+          y = NI.Plus(NI.Plus(NI.Mult(x,x),x), c);
+       }
+       return y;
+    }
 ```
+Comparisons:
++ Baseline: non generic, hand-specialized  code (one per T)
++ AbstractClass: generic class based (OOP style)
++ Interface: generic interface based (OOP style)
++ Delegate: generic, firt-class function based (OOP/FP style)
++ Instance: trait based (one dictionary value per call)
++ OptimizedInstance: optimized trait based (CSE on dictionaries) (shown above)
 
-x86 (Release Mode)
+---
+
+![x86](./images/bench/Slide1.png)
+
+---
+
+![x86](./images/bench/Slide2.png)
+
+---
+
+##x86 
+
+This is the actual code jitted at `NumInt:Num<int>`:
+
 ```masm
-00007FF9B5820D4B  call        00007FFA09A148C0  
 00007FF9B5820D50  mov         byte ptr [rsp+20h],0  
 00007FF9B5820D55  xor         eax,eax  
 00007FF9B5820D57  xor         edx,edx  
@@ -501,242 +508,41 @@ x86 (Release Mode)
 00007FF9B5820D79  ret  
 ```
 
+Just straight-up arithmetic: despite  abstraction, *no* function calls remain!
 ---
 
-```masm
---- C:\concepts\roslyn\concepts\conceptbench\conceptbench\Program.cs -----------
-        T ConceptGenericOpt<T, NumT>() where NumT : struct, Num<T> {
-...
-            System.Diagnostics.Debugger.Break();
-030E37CB  call        735E4558  
-030E37D0  nop  
-            NumT NI = default(NumT);
-030E37D1  lea         eax,[ebp-40h]  
-030E37D4  mov         byte ptr [eax],0  
-            T y = NI.FromInteger(0);
-030E37D7  lea         ecx,[ebp-40h]  
-030E37DA  xor         edx,edx  
-030E37DC  call        030E31B8  
-030E37E1  mov         dword ptr [ebp-5Ch],eax  
-030E37E4  mov         eax,dword ptr [ebp-5Ch]  
-030E37E7  mov         dword ptr [ebp-44h],eax  
-            T c = NI.FromInteger(666);
-030E37EA  lea         ecx,[ebp-40h]  
-            T c = NI.FromInteger(666);
-030E37ED  mov         edx,29Ah  
-030E37F2  call        030E31B8  
-030E37F7  mov         dword ptr [ebp-60h],eax  
-030E37FA  mov         eax,dword ptr [ebp-60h]  
-030E37FD  mov         dword ptr [ebp-48h],eax  
-            for (int i = 0; i < n; i++) {
-030E3800  xor         edx,edx  
-030E3802  mov         dword ptr [ebp-4Ch],edx  
-030E3805  nop  
-030E3806  jmp         030E3866  
-030E3808  nop  
-                T x = NI.FromInteger(i);
-030E3809  lea         ecx,[ebp-40h]  
-030E380C  mov         edx,dword ptr [ebp-4Ch]  
-030E380F  call        030E31B8  
-030E3814  mov         dword ptr [ebp-64h],eax  
-030E3817  mov         eax,dword ptr [ebp-64h]  
-030E381A  mov         dword ptr [ebp-50h],eax  
-                y = NI.Plus(NI.Plus(NI.Mult(x,x),x), c);
-030E381D  lea         eax,[ebp-40h]  
-030E3820  mov         dword ptr [ebp-68h],eax  
-030E3823  lea         eax,[ebp-40h]  
-030E3826  mov         dword ptr [ebp-6Ch],eax  
-030E3829  push        dword ptr [ebp-50h]  
-030E382C  lea         ecx,[ebp-40h]  
-030E382F  mov         edx,dword ptr [ebp-50h]  
-030E3832  call        030E31C8  
-030E3837  mov         dword ptr [ebp-70h],eax  
-030E383A  push        dword ptr [ebp-50h]  
-030E383D  mov         ecx,dword ptr [ebp-6Ch]  
-030E3840  mov         edx,dword ptr [ebp-70h]  
-030E3843  call        030E31D8  
-                y = NI.Plus(NI.Plus(NI.Mult(x,x),x), c);
-030E3848  mov         dword ptr [ebp-74h],eax  
-030E384B  push        dword ptr [ebp-48h]  
-030E384E  mov         ecx,dword ptr [ebp-68h]  
-030E3851  mov         edx,dword ptr [ebp-74h]  
-030E3854  call        030E31D8  
-030E3859  mov         dword ptr [ebp-78h],eax  
-030E385C  mov         eax,dword ptr [ebp-78h]  
-030E385F  mov         dword ptr [ebp-44h],eax  
-            }
-030E3862  nop  
-            for (int i = 0; i < n; i++) {
-030E3863  inc         dword ptr [ebp-4Ch]  
-030E3866  mov         eax,dword ptr [ebp-4Ch]  
-030E3869  cmp         eax,dword ptr ds:[5F4051Ch]  
-030E386F  setl        al  
-030E3872  movzx       eax,al  
-030E3875  mov         dword ptr [ebp-54h],eax  
-030E3878  cmp         dword ptr [ebp-54h],0  
-030E387C  jne         030E3808  
-            return y;
-030E387E  mov         eax,dword ptr [ebp-44h]  
-030E3881  mov         dword ptr [ebp-58h],eax  
-030E3884  nop  
-030E3885  jmp         030E3887  
-        }
-030E3887  mov         eax,dword ptr [ebp-58h]  
-030E388A  lea         esp,[ebp-0Ch]  
-030E388D  pop         ebx  
-030E388E  pop         esi  
-030E388F  pop         edi  
-030E3890  pop         ebp  
-030E3891  ret  
-```
----
-
-![x86](./images/bench/Slide1.png)
-
----
-
-![x86](./images/bench/Slide2.png)
-
----
-
-## Summary
+## Summary & Take Home
 
 -----------------------------
 | Haskell | .NET | Trait F# |
 |----------|--------|---------|
-|type class	| generic interface| trait |
-|(anonymous) instance| (named) struct  | (named) witness |
+|type class | generic interface| trait |
+|instance| (named) struct  | (named) witness |
 |derived instance | generic struct | generic witness |
-|type class inheritance	| interface inheritance | trait inheritance|
-|overloaded operation | constrained generic value | constrained generic value|
-|dictionary construction | explicit type construction | implicit type construction|
+|inheritance	| interface inheritance | trait inheritance|
+|overload | generic method | generic function|
 |implicit dictionary passing | explicit type passing | implicit type passing |
-|constraint inference & propagation | constraint checking | constraint solving |
---------------------------------------------------------------------------------
+|constraint solving | constraint checking | constraint solving |
+|constraint propagation | NA | constraint propagation |
+-------------------------------------------------------
 
----
-
-
-##  Syntactic Support
-
-* Distinguish type class declarations (new attribute [<Trait>])
-* Anonymize instance declarations (new keyword instance)
-* Add semi-implicit dictionary type abstraction (induced by concept constraints)
-* Add implicit dictionary type instantiation (by extending type argument inference)
-
----
-
-
-##  Anonymous classes, instances constraitns
-
-In Haskell, instances and constraints (but not type classes) are *anonymous*:
-* the programmer never  provides evidence for constraints
-* evidence can always be inferred 
-* evidence is always unique (by construction and imposed rules). 
-
-Concept C#:
-```fsharp
-  instance EqInt : Eq<int> {
-    bool Equals(int a, int b) => a == b;
-  }
-
-  instance <A>Eq<A[]> where EqA: Eq<A> {
-    bool Equals(A[] a, A[] b) {
-      if (a == null) return b == null;
-      if (b == null) return false;
-      if (a.Length != b.Length) return false;
-      for (int i = 0; i < a.Length; i++)
-        if (Equals(a[i], b[i])) return false;
-      return true;
-    }
-```
-
-We *could* do something similar:
-
-Concept C# with implicit instances:
-```fsharp
-  instance Eq<int> {
-    bool Equals(int a, int b) => a == b;
-  }
-  instance <A>Eq<A[]> where Eq<A> {
-    bool Equals(A[] a, A[] b) {
-      if (a == null) return b == null;
-      if (b == null) return false;
-      if (a.Length != b.Length) return false;
-      for (int i = 0; i < a.Length; i++)
-        if (Equals(a[i], b[i])) return false;
-      return true;
-    }
- }
-```
-
-More concise, but less flexiblee, and probably a bad idea, given C#'s limited type inference.
-
----
-
-##  Implementation Status
-
-* working compilers for C# and F#
-* separate compilation via trivial attributes recognized on imports, emitted on export.
-* C# syntax for named concepts, named instance and named concept constraints.
-* concept parameters must be invariant.
-* extended type argument inference to resolve concepts to instances 
-  (simple backchaining, exploiting Roslyn's type unification algorithm to find instantiations).
-* C# operators (+/- etc.) in concepts with extended operator resolution (just sugar, but important sugar).
-
-Future:
-* Associated types (concepts with abstract type components; compiled to additional parameters).
-* Anonymous concepts, instance and constraints - not convinced this is a good idea for C#.
-  * sans names, it's impossible to be explicit when C# type inference fails.
-* Currently, different type instantiations, though all type safe, can produce different semantics.
-  * adopt Haskell like restrictions to force coherence; or
-  * disambiguate with ad-hoc *betterness* rules.
-* Decidability of constraint solving.
-* Allow & exploit variance (no such thing in Haskell).
-
----
-
-
-##  Case Studies (In Progress)
-* Micro-benchmarks for perf (sorting done, need more)
-* Automatic Differentiation, overloading arithmetic to compute function derivatives [1]
-* Concept C# rendition of Haskell Prelude, including numeric tower (think BCL)
-* Generic QuickHull (one convex hull algorithm for generic vector spaces)
-* Generic Graph Library - Haskell used to trump C#, does it still?
-* C#,F# Numeric towers (haskell prelude)
-* Generic Interface to System.Numerics.Vector2D/Vector3D/Vector4D (see QuickHull)
-* THIS SPACE FOR RENT
-
-[1]["Conal Elliot, Beautiful Differentiation"]
-
-
----
-
-
-##  Take Home
 
 * Haskell 98's type classes have a type preserving .NET representation.
-* Dictionaries must be manually constructed and provided  (a modified C#/F# compiler could do this for the user.)
+* Dictionaries can be manually constructed and provided or, better, inferred.
 * Generated code is efficient:
     * Dictionaries are empty (stack-allocated) structs. 
     * Dictionary allocation has zero runtime cost.
-    * CLR's code specialization ensures all dictionary calls are direct calls at runtime. (In principle, these calls could be in-lined by the JIT compiler)
+    * CLR's code specialization ensures all dictionary calls are direct calls at runtime. Many are in-lined.
 
 ---
 
-
 ##  Links & References
-
 
 C# version of this document https://github.com/CaptainHayashi/roslyn/blob/master/concepts/docs/concepts.md.
 
 Roslyn fork: https://github.com/CaptainHayashi/roslyn.
 
 Roslyn https://github.com/dotnet/roslyn.
-
-Rust  *traits* https://doc.rust-lang.org/book/traits.html.
-
-Swift *protocols* https://developer.apple.com/library/ios/documentation/Swift/Conceptual/Swift_Programming_Language/Protocols.html.
 
 D. Gregor, J. Jarvi, J. Siek, B. Stroustrup, G. Dos Reis, and A. Lumsdaine. *Concepts: Linguistic support for generic programming in C++*, OOPSLA'06.
 
@@ -870,3 +676,196 @@ Concept C#:
 
 ![Perf](./images/perf.png)
 
+---
+
+
+```masm
+--- C:\concepts\roslyn\concepts\conceptbench\conceptbench\Program.cs -----------
+        T ConceptGenericOpt<T, NumT>() where NumT : struct, Num<T> {
+...
+            System.Diagnostics.Debugger.Break();
+030E37CB  call        735E4558  
+030E37D0  nop  
+            NumT NI = default(NumT);
+030E37D1  lea         eax,[ebp-40h]  
+030E37D4  mov         byte ptr [eax],0  
+            T y = NI.FromInteger(0);
+030E37D7  lea         ecx,[ebp-40h]  
+030E37DA  xor         edx,edx  
+030E37DC  call        030E31B8  
+030E37E1  mov         dword ptr [ebp-5Ch],eax  
+030E37E4  mov         eax,dword ptr [ebp-5Ch]  
+030E37E7  mov         dword ptr [ebp-44h],eax  
+            T c = NI.FromInteger(666);
+030E37EA  lea         ecx,[ebp-40h]  
+            T c = NI.FromInteger(666);
+030E37ED  mov         edx,29Ah  
+030E37F2  call        030E31B8  
+030E37F7  mov         dword ptr [ebp-60h],eax  
+030E37FA  mov         eax,dword ptr [ebp-60h]  
+030E37FD  mov         dword ptr [ebp-48h],eax  
+            for (int i = 0; i < n; i++) {
+030E3800  xor         edx,edx  
+030E3802  mov         dword ptr [ebp-4Ch],edx  
+030E3805  nop  
+030E3806  jmp         030E3866  
+030E3808  nop  
+                T x = NI.FromInteger(i);
+030E3809  lea         ecx,[ebp-40h]  
+030E380C  mov         edx,dword ptr [ebp-4Ch]  
+030E380F  call        030E31B8  
+030E3814  mov         dword ptr [ebp-64h],eax  
+030E3817  mov         eax,dword ptr [ebp-64h]  
+030E381A  mov         dword ptr [ebp-50h],eax  
+                y = NI.Plus(NI.Plus(NI.Mult(x,x),x), c);
+030E381D  lea         eax,[ebp-40h]  
+030E3820  mov         dword ptr [ebp-68h],eax  
+030E3823  lea         eax,[ebp-40h]  
+030E3826  mov         dword ptr [ebp-6Ch],eax  
+030E3829  push        dword ptr [ebp-50h]  
+030E382C  lea         ecx,[ebp-40h]  
+030E382F  mov         edx,dword ptr [ebp-50h]  
+030E3832  call        030E31C8  
+030E3837  mov         dword ptr [ebp-70h],eax  
+030E383A  push        dword ptr [ebp-50h]  
+030E383D  mov         ecx,dword ptr [ebp-6Ch]  
+030E3840  mov         edx,dword ptr [ebp-70h]  
+030E3843  call        030E31D8  
+                y = NI.Plus(NI.Plus(NI.Mult(x,x),x), c);
+030E3848  mov         dword ptr [ebp-74h],eax  
+030E384B  push        dword ptr [ebp-48h]  
+030E384E  mov         ecx,dword ptr [ebp-68h]  
+030E3851  mov         edx,dword ptr [ebp-74h]  
+030E3854  call        030E31D8  
+030E3859  mov         dword ptr [ebp-78h],eax  
+030E385C  mov         eax,dword ptr [ebp-78h]  
+030E385F  mov         dword ptr [ebp-44h],eax  
+            }
+030E3862  nop  
+            for (int i = 0; i < n; i++) {
+030E3863  inc         dword ptr [ebp-4Ch]  
+030E3866  mov         eax,dword ptr [ebp-4Ch]  
+030E3869  cmp         eax,dword ptr ds:[5F4051Ch]  
+030E386F  setl        al  
+030E3872  movzx       eax,al  
+030E3875  mov         dword ptr [ebp-54h],eax  
+030E3878  cmp         dword ptr [ebp-54h],0  
+030E387C  jne         030E3808  
+            return y;
+030E387E  mov         eax,dword ptr [ebp-44h]  
+030E3881  mov         dword ptr [ebp-58h],eax  
+030E3884  nop  
+030E3885  jmp         030E3887  
+        }
+030E3887  mov         eax,dword ptr [ebp-58h]  
+030E388A  lea         esp,[ebp-0Ch]  
+030E388D  pop         ebx  
+030E388E  pop         esi  
+030E388F  pop         edi  
+030E3890  pop         ebp  
+030E3891  ret  
+```
+
+---
+
+##  Syntactic Support
+
+* Distinguish type class declarations (new attribute [<Trait>])
+* Anonymize instance declarations (new keyword instance)
+* Add semi-implicit dictionary type abstraction (induced by concept constraints)
+* Add implicit dictionary type instantiation (by extending type argument inference)
+
+---
+
+
+##  Anonymous classes, instances constraitns
+
+In Haskell, instances and constraints (but not type classes) are *anonymous*:
+* the programmer never  provides evidence for constraints
+* evidence can always be inferred 
+* evidence is always unique (by construction and imposed rules). 
+
+Concept C#:
+```fsharp
+  instance EqInt : Eq<int> {
+    bool Equals(int a, int b) => a == b;
+  }
+
+  instance <A>Eq<A[]> where EqA: Eq<A> {
+    bool Equals(A[] a, A[] b) {
+      if (a == null) return b == null;
+      if (b == null) return false;
+      if (a.Length != b.Length) return false;
+      for (int i = 0; i < a.Length; i++)
+        if (Equals(a[i], b[i])) return false;
+      return true;
+    }
+```
+
+We *could* do something similar:
+
+Concept C# with implicit instances:
+```fsharp
+  instance Eq<int> {
+    bool Equals(int a, int b) => a == b;
+  }
+  instance <A>Eq<A[]> where Eq<A> {
+    bool Equals(A[] a, A[] b) {
+      if (a == null) return b == null;
+      if (b == null) return false;
+      if (a.Length != b.Length) return false;
+      for (int i = 0; i < a.Length; i++)
+        if (Equals(a[i], b[i])) return false;
+      return true;
+    }
+ }
+```
+
+More concise, but less flexible, and probably a bad idea, given C#'s limited type inference.
+
+---
+
+##  Implementation Status
+
+* working compilers for C# and F#
+* separate compilation via trivial attributes recognized on imports, emitted on export.
+* C# syntax for named concepts, named instance and named concept constraints.
+* concept parameters must be invariant.
+* extended type argument inference to resolve concepts to instances 
+  (simple backchaining, exploiting Roslyn's type unification algorithm to find instantiations).
+* C# operators (+/- etc.) in concepts with extended operator resolution (just sugar, but important sugar).
+
+---
+
+Future:
+* Associated types (concepts with abstract type components; compiled to additional parameters).
+* Anonymous concepts, instance and constraints - not convinced this is a good idea for C#.
+  * sans names, it's impossible to be explicit when C# type inference fails.
+* Currently, different type instantiations, though all type safe, can produce different semantics.
+  * adopt Haskell like restrictions to force coherence; or
+  * disambiguate with ad-hoc *betterness* rules.
+* Decidability of constraint solving.
+* Allow & exploit variance (no such thing in Haskell).
+
+---
+
+##  Case Studies (In Progress)
+* Micro-benchmarks for perf (sorting done, need more)
+* Automatic Differentiation, overloading arithmetic to compute function derivatives [1]
+* Concept C# rendition of Haskell Prelude, including numeric tower (think BCL)
+* Generic QuickHull (one convex hull algorithm for generic vector spaces)
+* Generic Graph Library - Haskell used to trump C#, does it still?
+* C#,F# Numeric towers (haskell prelude)
+* Generic Interface to System.Numerics.Vector2D/Vector3D/Vector4D (see QuickHull)
+* THIS SPACE FOR RENT
+
+[1]["Conal Elliot, Beautiful Differentiation"]
+
+
+---
+##  Machine Code
+
+
+![x86](./images/x86.png)
+
+---
