@@ -524,7 +524,8 @@ This is the actual code jitted at `NumInt:Num<int>`:
 00007FF9B5820D79  ret  
 ```
 
-Just straight-up arithmetic: despite  abstraction, *no* function calls remain!
+Notice this is just straight-up arithmetic: despite copious abstraction in the source code, *no* function calls remain!
+
 ---
 
 ## Summary & Take Home
