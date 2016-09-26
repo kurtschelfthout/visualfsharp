@@ -39,7 +39,9 @@ But not F# or C#.
 
 --
 
+
 ![wecandoit](./images/wecandoit.png)
+
 
 ---
 ##This talk:
@@ -84,7 +86,7 @@ Type classes can have less overhead than OO abstractions. Even zero overhead.
 Type classes allow efficient abstraction over numeric types (sorely missing in .NET).
 
 ---
-background-image: url(./images/cheaptrick.jpg)
+background-image: url(https://upload.wikimedia.org/wikipedia/en/b/b4/Cheaptrickalbum1977.jpg)
 ---
 
 ##  Haskell Type Classes
@@ -482,11 +484,21 @@ Comparisons:
 
 ---
 
-![x86](./images/bench/Slide1.png)
+
+![perf1](./images/bench/perf1.png)
+
+
+At primitive value type instantiations, trait performance is as good as hand specialised code, and much better than OO abstractions.
 
 ---
 
-![x86](./images/bench/Slide2.png)
+![perf2](./images/bench/perf2.png)
+
+
+At class instantiations, performance is slower than hand specialised code, but better than standard OO abstractions.
+
+At user-defined struct instantiations, performance is much worse than hand specialized code, for both standard OO and trait abstractions.
+This merits further investigation.
 
 ---
 
