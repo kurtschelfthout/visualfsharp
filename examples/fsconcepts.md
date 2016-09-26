@@ -86,7 +86,7 @@ Type classes can have less overhead than OO abstractions. Even zero overhead.
 Type classes allow efficient abstraction over numeric types (sorely missing in .NET).
 
 ---
-background-image: url(https://upload.wikimedia.org/wikipedia/en/b/b4/Cheaptrickalbum1977.jpg)
+<img src= "https://upload.wikimedia.org/wikipedia/en/b/b4/Cheaptrickalbum1977.jpg">
 ---
 
 ##  Haskell Type Classes
