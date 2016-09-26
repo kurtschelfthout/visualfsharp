@@ -2,7 +2,11 @@
 
 *(A natural representation for type classes in .NET)*
 
-Claudio Russo, Matt Windsor, Don Syme, James Clarke, Rupert Horlick
+* Claudio Russo (MSR)
+* Matt Windsor (York)
+* Don Syme (MSR)
+* James Clarke (Cambridge) 
+* Rupert Horlick (Cambridge)
 
 ---
 
