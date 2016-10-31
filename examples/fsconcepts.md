@@ -100,16 +100,15 @@ We represent a Haskell type class, e.g.
 
 as a *generic* F# interface:
 ```fsharp
- type Eq<'A> = interface 
-     abstract equal: 'A -> 'A -> bool 
- end
+type Eq<'A> = 
+    abstract equal: 'A -> 'A -> bool 
 ```
 
 Trait F#
 ```fsharp
- [<Trait>]
- type Eq<'A> = 
-     abstract equal: 'A -> 'A -> bool 
+[<Trait>]
+type Eq<'A> = 
+    abstract equal: 'A -> 'A -> bool 
 ```
 
 ---
@@ -184,10 +183,10 @@ A Haskell ground instance, eg.
 is translated to an F# *struct* implementing a trait (i.e. interface).
  
 ```fsharp
- type EqInt = struct 
+[<Struct>]
+type EqInt = 
       interface Eq<int> with 
         member this.equal a b = a = b
- end 
 ...
 ```
 
@@ -195,10 +194,10 @@ The struct is empty (think `unit`) but (!) has associated code.
 
 Trait F#:
 ```fsharp
- [<Witness>] // a.k.a instance
- type EqInt = 
-      interface Eq<int> with 
-        member equal a b = a = b // no 'this.'
+[<Witness>] // a.k.a instance
+type EqInt = 
+     interface Eq<int> with 
+       member equal a b = a = b // no 'this.'
 ...
 ```
 ---
@@ -228,25 +227,25 @@ We can represent a Haskell *parameterized instance* as a *generic struct*,
 implementing an interface but parameterized by suitably constrained type parameters. 
 
 ```fsharp
-type EqList<'A,'EqA when 'EqA : struct and 'EqA :> Eq<'A>> = struct
-      interface Eq<'A list> with
-        member this.equal a b =  // this unused
-            match a,b with
-            | a::l,b::m -> equal<'A,'EqA> a b && // type args reqd!
-                           equal<'A list,EqList<'A,'EqA>> l m
-            | [],[] -> true | _ ,_ -> false
- end 
+[<Struct>]
+type EqList<'A,'EqA when 'EqA : struct and 'EqA :> Eq<'A>> = 
+    interface Eq<'A list> with
+      member this.equal a b =  // this unused
+          match a,b with
+          | a::l,b::m -> equal<'A,'EqA> a b && // type args reqd!
+                         equal<'A list,EqList<'A,'EqA>> l m
+          | [],[] -> true | _ ,_ -> false
 ```
 
 Trait F#:
 ```fsharp
- [<Witness>]
- type EqList<'A,'EqA when 'EqA :> Eq<'A>> = // 'EqA:struct implicit
-      interface Eq<'A list> with
-        member equal a b = 
-            match a,b with
-            | a::l,b::m -> equal a b && equal l m
-            | [],[] -> true | _ ,_ -> false
+[<Witness>]
+type EqList<'A,'EqA when 'EqA :> Eq<'A>> = // 'EqA:struct implicit
+    interface Eq<'A list> with
+      member equal a b = 
+          match a,b with
+          | a::l,b::m -> equal a b && equal l m
+          | [],[] -> true | _ ,_ -> false
 ```
 
 ---
@@ -309,18 +308,18 @@ For example, equality based list membership in Haskell is defined as follows:
 
 In F#, we can encode this as:
 ```fsharp
- let rec elem<'A,'EqA when 'EqA:struct and 'EqA:>Eq<'A>> x ys =
-     match ys with
-     | [] -> false
-     | y::ys -> equal<'A,'EqA> x y && elem x ys
+let rec elem<'A,'EqA when 'EqA:struct and 'EqA:>Eq<'A>> x ys =
+    match ys with
+    | [] -> false
+    | y::ys -> equal<'A,'EqA> x y && elem x ys
 ```
 
 Trait F#:
 ```fsharp
- let rec elem x ys =
-     match ys with
-     | [] -> false
-     | y::ys -> equal x y && elem x ys
+let rec elem x ys =
+    match ys with
+    | [] -> false
+    | y::ys -> equal x y && elem x ys
 ```
 
 ---
@@ -341,40 +340,36 @@ Haskell supports (multiple) inheritance of super classes.
 
 In F#, we instead use ordinary (multiple) interface inheritance:
 ```fsharp
- type Num<'A> = interface
-     inherit Eq<'A>
-     abstract add: 'A -> 'A ->'A
-     abstract mult: 'A -> 'A ->'A
-     abstract neg: 'A -> 'A
- end
+type Num<'A> = 
+    inherit Eq<'A>
+    abstract add: 'A -> 'A ->'A
+    abstract mult: 'A -> 'A ->'A
+    abstract neg: 'A -> 'A
 
- type NumInt = struct
-     interface Num<int> with
-       member this.equal a b = equal<int,EqInt> a b // named instance!
-       member this.add a b = a + b
-       member this.mult a b  = a + b
-       member this.neg a = -a 
-     end
- end
+type NumInt = 
+    interface Num<int> with
+      member this.equal a b = equal<int,EqInt> a b // named instance!
+      member this.add a b = a + b
+      member this.mult a b  = a + b
+      member this.neg a = -a 
 ```
 
 Trait F#:
 ```fsharp
- [<Trait>]
- type Num<'A> = 
-     inherit Eq<'A>
-     abstract add: 'A -> 'A ->'A
-     abstract mult: 'A -> 'A ->'A
-     abstract neg: 'A -> 'A
+[<Trait>]
+type Num<'A> = 
+    inherit Eq<'A>
+    abstract add: 'A -> 'A ->'A
+    abstract mult: 'A -> 'A ->'A
+    abstract neg: 'A -> 'A
 
- [<Witness>]
- type NumInt = 
-     interface Num<int> with
-       member equal a b = equal<_,EqInt> a b 
-       member add a b = a + b
-       member mult a b  = a + b
-       member neg a = -a 
-     end
+[<Witness>]
+type NumInt = 
+    interface Num<int> with
+      member equal a b = equal<_,EqInt> a b 
+      member add a b = a + b
+      member mult a b  = a + b
+      member neg a = -a 
 ```
 
 * Haskell class inheritance ~ F# interface inheritance 
@@ -401,24 +396,24 @@ Subsumption derives (evidence for) a class from (evidence for) its subclasses.
 
 F#:
 ```fsharp
- let square<'A,'NumA when 'NumA:struct and 'NumA:>Num<'A>> x =
+let square<'A,'NumA when 'NumA:struct and 'NumA:>Num<'A>> x =
      defaultof<'NumA>.mult x x
 
- let rec memsq<'A,'NumA when 'NumA:struct and 'NumA:>Num<'A>> n a = 
-       match n with
-       | [] -> false
-       | (h::t) -> equal<'A,'NumA> h (square<'A,'NumA> a)
-                  // ^^^^ legal coz 'NumA :> Num<'A> :> Eq<'A> 
-                  || memsq<'A,'NumA> n a
+let rec memsq<'A,'NumA when 'NumA:struct and 'NumA:>Num<'A>> n a = 
+      match n with
+      | [] -> false
+      | (h::t) -> equal<'A,'NumA> h (square<'A,'NumA> a)
+                // ^^^^ legal coz 'NumA :> Num<'A> :> Eq<'A> 
+                || memsq<'A,'NumA> n a
 ```
 Trait F#:
 ```fsharp
- let square x = Num.mult x x
+let square x = Num.mult x x
 
- let rec memsq n a = 
-       match n with
-       | [] -> false
-       | (h::t) -> equal h (square a) || memsq n a
+let rec memsq n a = 
+    match n with
+    | [] -> false
+    | (h::t) -> equal h (square a) || memsq n a
 ```
 
 
