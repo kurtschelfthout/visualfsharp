@@ -497,30 +497,160 @@ This merits further investigation.
 
 ---
 
-##x86 
+##x86  (DEBUG)
 
 This is the actual code jitted at `NumInt:Num<int>`:
 
 ```masm
-00007FF9B5820D50  mov         byte ptr [rsp+20h],0  
-00007FF9B5820D55  xor         eax,eax  
-00007FF9B5820D57  xor         edx,edx  
-00007FF9B5820D59  mov         ecx,dword ptr [7FF9B5704884h]  
-00007FF9B5820D5F  test        ecx,ecx  
-00007FF9B5820D61  jle         00007FF9B5820D75  
-00007FF9B5820D63  mov         eax,edx  
-00007FF9B5820D65  imul        eax,edx  
-00007FF9B5820D68  add         eax,edx  
-00007FF9B5820D6A  add         eax,29Ah  
-00007FF9B5820D6F  inc         edx  
-00007FF9B5820D71  cmp         edx,ecx  
-00007FF9B5820D73  jl          00007FF9B5820D63  
-00007FF9B5820D75  add         rsp,28h  
-00007FF9B5820D79  ret  
+   696:             NumT NI = default(NumT);
+01140628  lea         eax,[ebp-10h]  
+0114062B  mov         byte ptr [eax],0  
+   697:             T y = NI.FromInteger(0);
+0114062E  lea         ecx,[ebp-10h]  
+01140631  xor         edx,edx  
+01140633  call        dword ptr ds:[0C65E78h]  
+01140639  mov         dword ptr [ebp-2Ch],eax  
+0114063C  mov         eax,dword ptr [ebp-2Ch]  
+0114063F  mov         dword ptr [ebp-14h],eax  
+   698:             T c = NI.FromInteger(666);
+01140642  lea         ecx,[ebp-10h]  
+01140645  mov         edx,29Ah  
+0114064A  call        dword ptr ds:[0C65E78h]  
+01140650  mov         dword ptr [ebp-30h],eax  
+01140653  mov         eax,dword ptr [ebp-30h]  
+01140656  mov         dword ptr [ebp-18h],eax  
+   699:             for (int i = 0; i < n; i++) {
+01140659  xor         edx,edx  
+0114065B  mov         dword ptr [ebp-1Ch],edx  
+0114065E  nop  
+0114065F  jmp         011406C3  
+01140661  nop  
+   700:                 T x = NI.FromInteger(i);
+01140662  lea         ecx,[ebp-10h]  
+01140665  mov         edx,dword ptr [ebp-1Ch]  
+01140668  call        dword ptr ds:[0C65E78h]  
+0114066E  mov         dword ptr [ebp-34h],eax  
+01140671  mov         eax,dword ptr [ebp-34h]  
+01140674  mov         dword ptr [ebp-20h],eax  
+   701:                 y = NI.Plus(NI.Plus(NI.Mult(x,x),x), c);
+01140677  lea         eax,[ebp-10h]  
+0114067A  mov         dword ptr [ebp-44h],eax  
+0114067D  lea         eax,[ebp-10h]  
+01140680  mov         dword ptr [ebp-48h],eax  
+01140683  push        dword ptr [ebp-20h]  
+01140686  lea         ecx,[ebp-10h]  
+01140689  mov         edx,dword ptr [ebp-20h]  
+0114068C  call        dword ptr ds:[0C65E8Ch]  
+01140692  mov         dword ptr [ebp-38h],eax  
+01140695  push        dword ptr [ebp-20h]  
+01140698  mov         ecx,dword ptr [ebp-48h]  
+0114069B  mov         edx,dword ptr [ebp-38h]  
+0114069E  call        dword ptr ds:[0C65EA0h]  
+011406A4  mov         dword ptr [ebp-3Ch],eax  
+011406A7  push        dword ptr [ebp-18h]  
+011406AA  mov         ecx,dword ptr [ebp-44h]  
+011406AD  mov         edx,dword ptr [ebp-3Ch]  
+011406B0  call        dword ptr ds:[0C65EA0h]  
+011406B6  mov         dword ptr [ebp-40h],eax  
+011406B9  mov         eax,dword ptr [ebp-40h]  
+011406BC  mov         dword ptr [ebp-14h],eax  
+   702:             }
+011406BF  nop  
+   699:             for (int i = 0; i < n; i++) {
+011406C0  inc         dword ptr [ebp-1Ch]  
+011406C3  mov         eax,dword ptr [ebp-1Ch]  
+011406C6  cmp         eax,dword ptr ds:[0C64500h]  
+011406CC  setl        al  
+011406CF  movzx       eax,al  
+011406D2  mov         dword ptr [ebp-24h],eax  
+011406D5  cmp         dword ptr [ebp-24h],0  
+011406D9  jne         01140661  
+   703:             return y;
+011406DB  mov         eax,dword ptr [ebp-14h]  
+011406DE  mov         dword ptr [ebp-28h],eax  
+011406E1  nop  
+011406E2  jmp         011406E4  
+   704:         }
+011406E4  mov         eax,dword ptr [ebp-28h]  
+011406E7  lea         esp,[ebp-8]  
+011406EA  pop         esi  
+011406EB  pop         edi  
+011406EC  pop         ebp  
+011406ED  ret  
 ```
 
-Notice this is just straight-up arithmetic: despite copious abstraction in the source code, *no* function calls remain!
+Notice this still has 4 *call* instructions in the inner loop - we are paying the cost of abstraction!
 
+Luckily, the JIT can do *much* better...
+---
+
+---
+
+##x86  (DEBUG)
+
+This, in  outline, is the x86 code jitted at `NumInt:Num<int>`:
+The real code is 64 lines of suboptimal masm (yuck).
+
+
+```masm
+    696:             NumT NI = default(NumT);
+    01140628  lea         eax,[ebp-10h]  
+    0114062B  mov         byte ptr [eax],0  
+    697:             T y = NI.FromInteger(0);
+... 01140633  call        dword ptr ds:[0C65E78h]   ...
+    698:             T c = NI.FromInteger(666);
+... 0114064A  call        dword ptr ds:[0C65E78h]   ...  
+    699:             for (int i = 0; i < n; i++) {
+    700:                 T x = NI.FromInteger(i);
+... 01140668  call        dword ptr ds:[0C65E78h]  ...
+    701:                 y = NI.Plus(NI.Plus(NI.Mult(x,x),x), c);
+... 0114068C  call        dword ptr ds:[0C65E8Ch]  ... 
+... 0114069E  call        dword ptr ds:[0C65EA0h]  ...  
+... 011406B0  call        dword ptr ds:[0C65EA0h]  ...
+    702:             }
+    703:             return y;
+    704:         }
+    011406E4  mov         eax,dword ptr [ebp-28h]  ... 
+... 011406ED  ret  
+```
+
+Notice this still has 4 *call* instructions in the inner loop - the cost of abstraction!
+
+Luckily, the JIT does *much* better ...
+---
+
+
+
+##x86 (RELEASE) 
+
+This is the optimised code jitted at `NumInt:Num<int>`.
+
+```masm
+   696:             NumT NI = default(NumT);
+00007FFD8BF85110  sub         rsp,8  
+00007FFD8BF85114  xor         eax,eax  
+00007FFD8BF85116  mov         qword ptr [rsp],rax  
+00007FFD8BF8511A  mov         byte ptr [rsp],0  
+00007FFD8BF8511E  xor         eax,eax  
+   699:             for (int i = 0; i < n; i++) {
+00007FFD8BF85120  xor         edx,edx  
+00007FFD8BF85122  mov         ecx,dword ptr [7FFD8BFC3B38h]  
+00007FFD8BF85128  test        ecx,ecx  
+00007FFD8BF8512A  jle         00007FFD8BF8513E  
+00007FFD8BF8512C  mov         eax,edx  
+00007FFD8BF8512E  imul        eax,edx  
+00007FFD8BF85131  add         eax,edx  
+00007FFD8BF85133  add         eax,29Ah  
+00007FFD8BF85138  inc         edx  
+00007FFD8BF8513A  cmp         edx,ecx  
+00007FFD8BF8513C  jl          00007FFD8BF8512C  
+00007FFD8BF8513E  add         rsp,8  
+00007FFD8BF85142  ret  
+```
+
+Notice this is straight-up arithmetic code! Just 18 lines of masm (was 64 lines)
+
+*No* function calls/stack manipulation remain! *Way faster*.
 ---
 
 ## Summary & Take Home
@@ -572,4 +702,79 @@ D. Yu, A. Kennedy, and D. Syme. *Formalization of generics for the .net common l
 
 
 
+---
 
+# Java/JVM Generics
+
+Java generics are a fiction of the compiler's imagination.
+
+The Java vritual machine knows zilch about type parameters let alone their instantiations (Erasure Semantics).
+
+All instantiations of generic type must have the same least common denominator representation (a heaper pointer).
+
+Because of erasure Java, has to rule out certain (arguably useful!) constructs:
+
+```java
+new T()         // illegal Java allocation
+new T[100]      // illegal Java array construction
+(T) o           // illegal Java cast 
+(List<int>) o   // illegal Java cast
+List<Int>       // legal, but boxes every entry (fat and slow)
+List<int>       // illegal, instantiation not pointer sized 
+sizeof(List<Int>) == sizeof(List<Bool)) == sizeof(List<String>) 
+```
+
+---
+
+# C#/CLI Generics
+
+In C#, Generics are built into the runtime (through dedicated bytecodes & type information).
+
+The CLI runtime "knows" about type parameters and their instantiations at runtime (Type Passing Semantics).
+
+The runtime is free to choose different sized representations for different types, even when used as type arguments.
+
+```csharp
+new T()         // legal C#
+new T[100]      // legal C#
+(T)o            // legal C#
+(List<int>) o   // legal C#
+List<byte>       // legal, note instantiation not pointer sized 
+sizeof(List<int>) =/= sizeof(List<Bool>) =/= sizeof(List<String>)
+// even THIS is ok (though it arguably isn't...)
+if (typeof<T> == typeof<int>) 
+   Write("I just broke parametericity!");  
+```
+
+---
+
+# Code Specialization
+
+Importantly, for performance, the CLR generates specialised code for particular instantiations (Kennedy & Syme, 2001)
+
+Types comes in two flavours:
+    * *value types* (scalar primitives & user defined structures). Cheap to allocate, passed by value.
+    * heap-allocated *reference types* (objects & arrays). Expensive to allocate, passed by reference.
+
+Type parameters range over/can be instantiated with both flavours.
+
+Generic code instantiated at *reference* (ie. heap) types (`object`,`string`, `int[]`) is shared between all reference type instantiations (with some indirection
+for type specific operations).
+
+Generic code instantiated at *value* types (`int16`, `int32`, `point`) is *specialized* for each instantiation.
+
+Code instantiated at mixtures of reference and non-reference types is "partially" specialized (its complicated).
+
+---
+
+# Benefits of Specialization
+
+Specialization  typically happens *just-in-time* (i.e. at runtime, at first instantiation). 
+
+Specialization replaces statically unknown representation sizes by dynamically known ones.
+
+Like static inlining, type specialization can turn indirect calls to unknown functions into direct calls to known functions. 
+
+Futhermore, once known, functions can be inlined, removing any function call overhead altogether.
+
+(An on-demand version of C++'s compile time specialization.)
