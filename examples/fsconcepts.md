@@ -53,11 +53,19 @@ We add type classes to F# using a cheap coding trick that is
 * essentially free (zero VM modifications required)
 * modular
 
-For F#, we call type classes *traits* (Don's preference).
+For F#, we call a type class a *trait* and instance a *witness* (Don's preference).
 
-The same technique works interoperably for C# etc. 
+The same technique works interoperably for C# etc.
+(In C#, a type class is called *concept* and an instance *instance*).
 
-*Trait F#* and *Concept C#* are implemented as open source prototypes.
+
+
+*Trait F#* and [*Concept C#](https://github.com/CaptainHayashi/roslyn/blob/master/concepts/docs/concepts.md).
+are implemented as open source prototypes.
+
+
+
+
 
 ---
 
@@ -212,7 +220,6 @@ type Eq<'A> =
     abstract equal: 'A -> 'A -> bool 
 ```
 
-
 *Trait F#* just adds a distinctive `Trait` attribute (in keeping with F#'s other attributes):
 
 ```fsharp
@@ -221,7 +228,7 @@ type Eq<'A> =
     abstract equal: 'A -> 'A -> bool 
 ```
 
-(I'd prefer a new keyword, but never mind...)
+[*] I'd prefer a new 'trait' keyword, but never mind...
 ---
 
 ## Haskell Overloads
