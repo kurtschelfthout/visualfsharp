@@ -88,7 +88,7 @@ A *generic instance* defines *families* of instances, predicated on class member
 
 ## Why should .NET care?
 
-Instance declarations are decoupled from their types (unlike interfaces).
+Instance declarations are decoupled from their types (unlike an OO class' interfaces).
 
 Type classes can have less overhead than OO abstractions. Even zero overhead.
 
@@ -114,9 +114,9 @@ Our approach:
 
 ---
 
-## Generics Recap
+# Generics Recap
 
-define *Generics*: object oriented lingo for *F-bounded parametric polymorphism* 
+define *Generics*: object-oriented lingo for *F-bounded parametric polymorphism* 
 
 ---
 
@@ -136,7 +136,7 @@ Because of erasure, Java has to rule out certain (arguably useful!) constructs:
 new T()         // illegal Java allocation
 new T[100]      // illegal Java array construction
 (T) o           // illegal Java cast 
-(List<int>) o   // illegal Java cast
+(List<Int>) o   // illegal Java cast
 List<Int>       // legal, but boxes every entry (fat and slow)
 List<int>       // illegal, instantiation not pointer sized 
 sizeof(List<Int>) == sizeof(List<Bool)) == sizeof(List<String>) 
@@ -191,15 +191,16 @@ Code instantiated at mixtures of reference and non-reference types is "partially
 
 ## Benefits of Specialization
 
-Specialization  typically happens *just-in-time* (i.e. at runtime, at first instantiation). 
+Specialization  typically happens *just-in-time* (i.e. at run time, at first unseen instantiation). 
 
 Specialization replaces statically unknown representation sizes by dynamically known ones.
 
 Like static inlining, type specialization can turn indirect calls (to *unknown* functions) into faster, direct calls to *known* functions. 
 
-Futhermore, *known* functions can be *inlined*, removing function call overhead altogether and exposing more optimizations.
+Futhermore, *known* functions can be *inlined*, removing function call overhead altogether and exposing yet more optimizations.
 
-(An on-demand version of C++'s compile time specialization.)
+(An run time version of C++'s compile time type specialization.)
+
 ---
 
 ![CheapTrick](./images/CheapTrick.png)
