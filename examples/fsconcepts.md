@@ -194,7 +194,7 @@ Futhermore, *known* functions can be *inlined*, removing function call overhead 
 (An on-demand version of C++'s compile time specialization.)
 ---
 
-![CheapTrick](./images/cheaptrick.png)
+![CheapTrick](./images/CheapTrick.png)
 
 ---
 ##  Haskell Type Classes
