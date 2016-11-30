@@ -695,6 +695,7 @@ Notice this is straight-up arithmetic code! Just 18 lines of masm (was 64 lines)
 
 Unlike F#, our more rounded C# implementation adds dedicated keywords, Haskell-style defaulting
 and full support for numeric operator syntax, e.g.:
+
 ```csharp
 concept Eq<A> {
     bool Equal(A a, A b);
@@ -715,7 +716,7 @@ instance EqList<A, implicit EqA> : Eq<List<A>> where EqA : Eq<A> {
            && Equal(a.Tail,b.Tail)); 
 }
 ```
-In Concept C#, Witness inference is a mild extension of (concept-drived) type argument inference.
+In Concept C#, witness inference is a mild, concept-driven extension of type argument inference.
 
 ---
 
@@ -723,7 +724,7 @@ In Concept C#, Witness inference is a mild extension of (concept-drived) type ar
 
 * Micro-benchmarks for perf (sorting & arithmetic)
 * Automatic Differentiation in C#/F#, overloading arithmetic to compute function derivatives [1]
-* C# , F# renditions of Haskell Prelude, including numeric tower
+* C#, F# renditions of Haskell Prelude, including numeric tower
 * C# Generic QuickHull (one convex hull algorithm for generic vector spaces)
 
 Future:
