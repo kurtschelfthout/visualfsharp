@@ -230,6 +230,7 @@ type Eq<'A> =
 ```
 
 [*] I'd prefer a new 'trait' keyword, but never mind...
+
 ---
 
 ## Haskell Overloads
@@ -602,13 +603,15 @@ Comparisons:
 + Delegate: generic, firt-class function based (OOP/FP style)
 + Instance: trait based (one dictionary value per call)
 + OptimizedInstance: optimized trait based (CSE on dictionaries) (shown above)
-
++ OptimizedInstanceInlined: optimized trait based (CSE on dictionaries) with C# static operator definitions inlined in witness declaration.
 ---
 ###  Relative Performance at Scalar types
 
 ![perf1](./images/perf1.png)
 
-At primitive value type instantiations, trait performance is:
+(lower is better - ideally leftmost baseline (non-generic, hand-specialized code) equals rightmost generic, trait-based code.
+
+At scalar primitive value type instantiations, trait performance is:
 * as good as hand specialised code, 
 * at least *8-14x faster* than standard OO abstractions.
 
@@ -617,8 +620,9 @@ At primitive value type instantiations, trait performance is:
 
 ![perf2](./images/perf2.png)
 
+(lower is better - ideally leftmost baseline (non-generic, hand-specialized code) equals rightmost generic, trait-based code.
 
-At 3 field class and struct instantiations, performance can be competive with hand specialised code, 
+At 3-field class and struct instantiations, performance can be competive with hand specialised code, 
 1.4-8x faster than OO abstractions (if we are careful to inline).
 
 ---
@@ -626,7 +630,7 @@ At 3 field class and struct instantiations, performance can be competive with ha
 ##x86  (DEBUG)
 
 This, in  outline, is the x86 code jitted at `NumInt:Num<int>`:
-The real code is 64 lines of suboptimal masm (yuck).
+The real code is *64 lines* of suboptimal masm (yuck).
 
 
 ```masm
@@ -653,10 +657,9 @@ The real code is 64 lines of suboptimal masm (yuck).
 
 Notice this still has 4 *call* instructions in the inner loop - the cost of abstraction!
 
-Luckily, the *optimizing* JIT does *much* better ...
+But this is debug code, the *optimizing* JIT does *much* better ...
+
 ---
-
-
 
 ##x86 (RELEASE) 
 
@@ -687,7 +690,9 @@ This is the optimised code jitted at `NumInt:Num<int>`.
 
 + Notice this is straight-up arithmetic code! Just 18 lines of masm (was 64 lines)
 + *No* function calls/stack manipulation remain! *Way faster* than debug code.
-+ Quality almost as good as hand-specialized code (dictionary initialization remains but is dead)
++ Dictionary initialization remains but the dictionary is dead and could be deleted)
++ Otherwise, code quality as good as hand-specialized code.
+
 ---
 
 
