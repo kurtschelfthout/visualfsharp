@@ -3,8 +3,8 @@
 *(A natural representation for type classes in .NET)*
 
 * Claudio Russo (MSR)
-* Matt Windsor (York)
-* Don Syme (MSR)
+* Matt Windsor (York) (the amazing intern who did most of the hard C# work!)
+* Don Syme (MSR) 
 * James Clarke (Cambridge) 
 * Rupert Horlick (Cambridge)
 
@@ -16,7 +16,7 @@
 
 --
 
-**How annoying...** 
+### **How annoying!** 
 
 ---
 
@@ -73,11 +73,12 @@ Type classes form hierarchies with *inheritance* and *subsumption*.
 
 A *generic instance* defines *families* of instances, predicated on class membership.
 
-...
+
+---
 
 
 
-### Why should .NET care?
+## Why should .NET care?
 
 Instance declarations are decoupled from their types (unlike interfaces).
 
@@ -86,9 +87,116 @@ Type classes can have less overhead than OO abstractions. Even zero overhead.
 Type classes allow efficient abstraction over numeric types (sorely missing in .NET).
 
 ---
-<img src= "https://upload.wikimedia.org/wikipedia/en/b/b4/Cheaptrickalbum1977.jpg">
+
+###  ~~"Static Interface Methods for the CLR"~~
+
+.NET team previously proposed and prototyped "Static Interface Methods for the CLR", 
+driven by customer demand for *efficient* abstraction over numeric types.
+
+Why didn't this proposal make it?
+* It required both runtime & framework changes (too expensive).
+* It has soundness issues (too risky).
+
+Our approach:
+* requires *no* changes to the runtime or frameworks.
+* Is *sound by construction* (due to evidence passing).
+
+![static interface methods](./images/staticinterfaces.png)
+
+
 ---
 
+## Generics Recap
+
+define *Generics*: object oriented lingo for *F-bounded parameteric polymorphism* 
+
+---
+
+## Java/JVM Generics
+
+Java generics are a fiction of the compiler's imagination.
+
+Compiled by "erasing type parameters to their bounds or `object`".
+
+*Erasure Semantics* means the Java VM knows nothing about type parameters, let alone their instantiations .
+
+All instantiations of generic type must have the same least common denominator representation (a heaper pointer).
+
+Because of erasure, Java has to rule out certain (arguably useful!) constructs:
+
+```java
+new T()         // illegal Java allocation
+new T[100]      // illegal Java array construction
+(T) o           // illegal Java cast 
+(List<int>) o   // illegal Java cast
+List<Int>       // legal, but boxes every entry (fat and slow)
+List<int>       // illegal, instantiation not pointer sized 
+sizeof(List<Int>) == sizeof(List<Bool)) == sizeof(List<String>) 
+```
+
+---
+
+## C#/F#/CLI Generics
+
+In C#, Generics are built into the runtime (through dedicated bytecodes & type information).
+
+Compiled by "passing types at runtime".
+
+*Type Passing* means the CLI VM knows about type parameters and their instantiations at runtime.
+
+The runtime is free to choose different sized representations for different types, even when used as type arguments.
+
+```csharp
+new T()         // legal C#
+new T[100]      // legal C#
+(T)o            // legal C#
+(List<int>) o   // legal C#
+List<byte>       // legal, note instantiation not pointer sized 
+sizeof(List<int>) =/= sizeof(List<bool>) =/= sizeof(List<String>)
+// even THIS is ok (though it arguably isn't...)
+if (typeof<T> == typeof<int>) 
+   Write("I just broke parametericity!");  
+```
+
+---
+
+## Code Specialization
+
+Importantly, for performance, the CLR generates specialised code for particular instantiations (Kennedy & Syme, 2001)
+
+Types comes in two flavours:
+* *value types* (scalar primitives & user defined structures). 
+   Cheaply stack-allocated, passed by value.
+* *reference types* (objects & arrays). 
+   Expensively heap-allocated, passed by reference.
+
+Type parameters range over/can be instantiated with both flavours.
+
+Code instantiated at *reference* (ie. heap) types (`object`,`string`, `int[]`) is *shared* between all reference type instantiations (with some indirection
+for type specific operations) (to avoid code bloat).
+
+Code instantiated at *value* types (`int16`, `int32`, `point`) is *specialized* for each instantiation.
+
+Code instantiated at mixtures of reference and non-reference types is "partially" specialized (it's complicated).
+
+---
+
+## Benefits of Specialization
+
+Specialization  typically happens *just-in-time* (i.e. at runtime, at first instantiation). 
+
+Specialization replaces statically unknown representation sizes by dynamically known ones.
+
+Like static inlining, type specialization can turn indirect calls (to *unknown* functions) into faster, direct calls to *known* functions. 
+
+Futhermore, *known* functions can be *inlined*, removing function call overhead altogether and exposing more optimizations.
+
+(An on-demand version of C++'s compile time specialization.)
+---
+
+![Cheap Trick!](./images/cheaptrick.png)
+
+---
 ##  Haskell Type Classes
  
 We represent a Haskell type class, e.g.
@@ -354,6 +462,10 @@ type NumInt =
       member this.neg a = -a 
 ```
 
+---
+
+## ... Inheritance
+
 Trait F#:
 ```fsharp
 [<Trait>]
@@ -422,29 +534,32 @@ let rec memsq n a =
 
 ## MSIL ByteCode
 
-IL:
-```cil
-.method public hidebysig static bool
-    Equals< A, 
-    	    valuetype .ctor([mscorlib]System.ValueType, class Eq.Eq`1<!!A>) EqA> 
+```fsharp
+ let equal<'A,'EqA when 'EqA : struct and 'EqA :> Eq<'A>> a b =
+       defaultof<'EqA>.equal a b
+```
+
+Compiles to (something like) CIL generic bytecode:
+
+```c
+.method public static bool equal<A, 
+                                 struct .ctor(class Eq<!!A>) EqA> 
    (!!A a,!!A b) 
    cil managed {
-   .locals init ([0] !!EqA loc1,[1] !!EqA loc2)
-   ldloca.s loc1  // stack allocate dictionary
-   initobj !!EqA 
-   ldloc.0
-   stloc.1
-   ldloca.s loc2
-   ldarg.0
-   ldarg.1
-   constrained. !!EqA
-   callvirt instance bool class Eq.Eq`1<!!A>::Equals(!0, !0) 
+   .locals init ([0] !!EqA loc1)
+   ldloca.s loc1      // stack allocate dictionary
+   initobj !!EqA      // initialize (empty) dictionary
+   ldloca.s loc1      // load address of dictionary onto stack
+   ldarg.0            // load argument 1   
+   ldarg.1            // load argument 2
+   constrained. !!EqA // pseudo virtual call through dictionary
+   callvirt instance bool class Eq<!!A>::equals(!0, !0) 
    ret
 }
 ```
 The `callvirt` instruction is typically used for an indirect call to a virtual method.
 
-When `EqA` is a struct, due to specialization, the callee is always known and often inlined.
+When actual type `EqA` is a struct, due to specialization, the callee is always known and often inlined.
 
 ---
 
@@ -478,111 +593,22 @@ Comparisons:
 + OptimizedInstance: optimized trait based (CSE on dictionaries) (shown above)
 
 ---
+###  Relative Performance at Scalar types
 
+![perf1](./images/perf1.png)
 
-![perf1](./images/bench/perf1.png)
-
-
-At primitive value type instantiations, trait performance is as good as hand specialised code, and much better than OO abstractions.
-
----
-
-![perf2](./images/bench/perf2.png)
-
-
-At class instantiations, performance is slower than hand specialised code, but better than standard OO abstractions.
-
-At user-defined struct instantiations, performance is much worse than hand specialized code, for both standard OO and trait abstractions.
-This merits further investigation.
+At primitive value type instantiations, trait performance is:
+* as good as hand specialised code, 
+* at least *8-14x faster* than standard OO abstractions.
 
 ---
+### Relative Performance at Compound Types
 
-##x86  (DEBUG)
+![perf2](./images/perf2.png)
 
-This is the actual code jitted at `NumInt:Num<int>`:
 
-```masm
-   696:             NumT NI = default(NumT);
-01140628  lea         eax,[ebp-10h]  
-0114062B  mov         byte ptr [eax],0  
-   697:             T y = NI.FromInteger(0);
-0114062E  lea         ecx,[ebp-10h]  
-01140631  xor         edx,edx  
-01140633  call        dword ptr ds:[0C65E78h]  
-01140639  mov         dword ptr [ebp-2Ch],eax  
-0114063C  mov         eax,dword ptr [ebp-2Ch]  
-0114063F  mov         dword ptr [ebp-14h],eax  
-   698:             T c = NI.FromInteger(666);
-01140642  lea         ecx,[ebp-10h]  
-01140645  mov         edx,29Ah  
-0114064A  call        dword ptr ds:[0C65E78h]  
-01140650  mov         dword ptr [ebp-30h],eax  
-01140653  mov         eax,dword ptr [ebp-30h]  
-01140656  mov         dword ptr [ebp-18h],eax  
-   699:             for (int i = 0; i < n; i++) {
-01140659  xor         edx,edx  
-0114065B  mov         dword ptr [ebp-1Ch],edx  
-0114065E  nop  
-0114065F  jmp         011406C3  
-01140661  nop  
-   700:                 T x = NI.FromInteger(i);
-01140662  lea         ecx,[ebp-10h]  
-01140665  mov         edx,dword ptr [ebp-1Ch]  
-01140668  call        dword ptr ds:[0C65E78h]  
-0114066E  mov         dword ptr [ebp-34h],eax  
-01140671  mov         eax,dword ptr [ebp-34h]  
-01140674  mov         dword ptr [ebp-20h],eax  
-   701:                 y = NI.Plus(NI.Plus(NI.Mult(x,x),x), c);
-01140677  lea         eax,[ebp-10h]  
-0114067A  mov         dword ptr [ebp-44h],eax  
-0114067D  lea         eax,[ebp-10h]  
-01140680  mov         dword ptr [ebp-48h],eax  
-01140683  push        dword ptr [ebp-20h]  
-01140686  lea         ecx,[ebp-10h]  
-01140689  mov         edx,dword ptr [ebp-20h]  
-0114068C  call        dword ptr ds:[0C65E8Ch]  
-01140692  mov         dword ptr [ebp-38h],eax  
-01140695  push        dword ptr [ebp-20h]  
-01140698  mov         ecx,dword ptr [ebp-48h]  
-0114069B  mov         edx,dword ptr [ebp-38h]  
-0114069E  call        dword ptr ds:[0C65EA0h]  
-011406A4  mov         dword ptr [ebp-3Ch],eax  
-011406A7  push        dword ptr [ebp-18h]  
-011406AA  mov         ecx,dword ptr [ebp-44h]  
-011406AD  mov         edx,dword ptr [ebp-3Ch]  
-011406B0  call        dword ptr ds:[0C65EA0h]  
-011406B6  mov         dword ptr [ebp-40h],eax  
-011406B9  mov         eax,dword ptr [ebp-40h]  
-011406BC  mov         dword ptr [ebp-14h],eax  
-   702:             }
-011406BF  nop  
-   699:             for (int i = 0; i < n; i++) {
-011406C0  inc         dword ptr [ebp-1Ch]  
-011406C3  mov         eax,dword ptr [ebp-1Ch]  
-011406C6  cmp         eax,dword ptr ds:[0C64500h]  
-011406CC  setl        al  
-011406CF  movzx       eax,al  
-011406D2  mov         dword ptr [ebp-24h],eax  
-011406D5  cmp         dword ptr [ebp-24h],0  
-011406D9  jne         01140661  
-   703:             return y;
-011406DB  mov         eax,dword ptr [ebp-14h]  
-011406DE  mov         dword ptr [ebp-28h],eax  
-011406E1  nop  
-011406E2  jmp         011406E4  
-   704:         }
-011406E4  mov         eax,dword ptr [ebp-28h]  
-011406E7  lea         esp,[ebp-8]  
-011406EA  pop         esi  
-011406EB  pop         edi  
-011406EC  pop         ebp  
-011406ED  ret  
-```
-
-Notice this still has 4 *call* instructions in the inner loop - we are paying the cost of abstraction!
-
-Luckily, the JIT can do *much* better...
----
+At 3 field class and struct instantiations, performance can be competive with hand specialised code, 
+1.4-8x faster than OO abstractions (if we are careful to inline).
 
 ---
 
@@ -616,7 +642,7 @@ The real code is 64 lines of suboptimal masm (yuck).
 
 Notice this still has 4 *call* instructions in the inner loop - the cost of abstraction!
 
-Luckily, the JIT does *much* better ...
+Luckily, the *optimizing* JIT does *much* better ...
 ---
 
 
@@ -653,7 +679,54 @@ Notice this is straight-up arithmetic code! Just 18 lines of masm (was 64 lines)
 *No* function calls/stack manipulation remain! *Way faster*.
 ---
 
-## Summary & Take Home
+
+## Concept CSharp (Matt Windsor)
+
+Unlike F#, our more rounded C# implementation adds dedicated keywords, Haskell-style defaulting
+and full support for numeric operator syntax, e.g.:
+```csharp
+concept Eq<A> {
+    bool Equal(A a, A b);
+}
+static class Overloads {
+    public static bool Eq<A, implicit EqA>(A a, A b)
+		 where EqA : Eq<A> => 
+       Equals(a, b);
+}
+instance EqInt : Eq<int> {
+    bool Equal(int a, int b) => a == b;
+}
+instance EqList<A, implicit EqA> : Eq<List<A>> where EqA : Eq<A> {
+     public bool Equal(List<A> a, List<A> b)  =>
+          (a.IsNull && b.IsNull)
+       || (a.IsCons && b.IsCons 
+           && default(EqA).Equal(a.Head,b.Head) 
+           && Equal(a.Tail,b.Tail)); 
+}
+```
+In Concept C#, Witness inference is a mild extension of (concept-drived) type argument inference.
+
+---
+
+## Proposed Case Studies (In Progress)
+
+* Micro-benchmarks for perf (sorting & arithmetic)
+* Automatic Differentiation in C#/F#, overloading arithmetic to compute function derivatives [1]
+* C# , F# renditions of Haskell Prelude, including numeric tower
+* C# Generic QuickHull (one convex hull algorithm for generic vector spaces)
+
+Future:
+
+* C# Generic Graph Library - Haskell used to trump C#, does it still?
+* Pickling
+* Normalization by Evaluation
+* ... any suggestions?
+
+[1]["Conal Elliot, Beautiful Differentiation"]
+
+---
+
+## Summary 
 
 -----------------------------
 | Haskell | .NET | Trait F# |
@@ -668,21 +741,35 @@ Notice this is straight-up arithmetic code! Just 18 lines of masm (was 64 lines)
 |constraint propagation | NA | constraint propagation |
 -------------------------------------------------------
 
+---
 
+## Take Home
 * Haskell 98's type classes have a type preserving .NET representation.
 * Dictionaries can be manually constructed and provided or, better, inferred.
 * Generated code is efficient:
     * Dictionaries are empty (stack-allocated) structs. 
     * Dictionary allocation has zero runtime cost.
     * CLR's code specialization ensures all dictionary calls are direct calls at runtime. Many are in-lined.
+---
+
+## Future work:
+
+* Exploit variance in interfaces (no Haskell analog).
+* Dedicated F# syntax.
+* Associated Types/Poor Man's Modules
+* JIT/Compiler comptimizations (sharing dictionary values, hoisting stack initialization out of loops).
+* tech transfer (hearts and minds)
+* Justified, Pluggable Types
 
 ---
 
 ##  Links & References
 
+F# fork: https://github.com/CaptainHayashi/visualfsharp/tree/hackathon-vs
+
 C# version of this document https://github.com/CaptainHayashi/roslyn/blob/master/concepts/docs/concepts.md.
 
-Roslyn fork: https://github.com/CaptainHayashi/roslyn.
+Roslyn C# fork: https://github.com/CaptainHayashi/roslyn.
 
 Roslyn https://github.com/dotnet/roslyn.
 
@@ -702,79 +789,3 @@ D. Yu, A. Kennedy, and D. Syme. *Formalization of generics for the .net common l
 
 
 
----
-
-# Java/JVM Generics
-
-Java generics are a fiction of the compiler's imagination.
-
-The Java vritual machine knows zilch about type parameters let alone their instantiations (Erasure Semantics).
-
-All instantiations of generic type must have the same least common denominator representation (a heaper pointer).
-
-Because of erasure Java, has to rule out certain (arguably useful!) constructs:
-
-```java
-new T()         // illegal Java allocation
-new T[100]      // illegal Java array construction
-(T) o           // illegal Java cast 
-(List<int>) o   // illegal Java cast
-List<Int>       // legal, but boxes every entry (fat and slow)
-List<int>       // illegal, instantiation not pointer sized 
-sizeof(List<Int>) == sizeof(List<Bool)) == sizeof(List<String>) 
-```
-
----
-
-# C#/CLI Generics
-
-In C#, Generics are built into the runtime (through dedicated bytecodes & type information).
-
-The CLI runtime "knows" about type parameters and their instantiations at runtime (Type Passing Semantics).
-
-The runtime is free to choose different sized representations for different types, even when used as type arguments.
-
-```csharp
-new T()         // legal C#
-new T[100]      // legal C#
-(T)o            // legal C#
-(List<int>) o   // legal C#
-List<byte>       // legal, note instantiation not pointer sized 
-sizeof(List<int>) =/= sizeof(List<Bool>) =/= sizeof(List<String>)
-// even THIS is ok (though it arguably isn't...)
-if (typeof<T> == typeof<int>) 
-   Write("I just broke parametericity!");  
-```
-
----
-
-# Code Specialization
-
-Importantly, for performance, the CLR generates specialised code for particular instantiations (Kennedy & Syme, 2001)
-
-Types comes in two flavours:
-    * *value types* (scalar primitives & user defined structures). Cheap to allocate, passed by value.
-    * heap-allocated *reference types* (objects & arrays). Expensive to allocate, passed by reference.
-
-Type parameters range over/can be instantiated with both flavours.
-
-Generic code instantiated at *reference* (ie. heap) types (`object`,`string`, `int[]`) is shared between all reference type instantiations (with some indirection
-for type specific operations).
-
-Generic code instantiated at *value* types (`int16`, `int32`, `point`) is *specialized* for each instantiation.
-
-Code instantiated at mixtures of reference and non-reference types is "partially" specialized (its complicated).
-
----
-
-# Benefits of Specialization
-
-Specialization  typically happens *just-in-time* (i.e. at runtime, at first instantiation). 
-
-Specialization replaces statically unknown representation sizes by dynamically known ones.
-
-Like static inlining, type specialization can turn indirect calls to unknown functions into direct calls to known functions. 
-
-Futhermore, once known, functions can be inlined, removing any function call overhead altogether.
-
-(An on-demand version of C++'s compile time specialization.)
