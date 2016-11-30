@@ -108,7 +108,7 @@ Our approach:
 
 ## Generics Recap
 
-define *Generics*: object oriented lingo for *F-bounded parameteric polymorphism* 
+define *Generics*: object oriented lingo for *F-bounded parametric polymorphism* 
 
 ---
 
