@@ -194,7 +194,7 @@ Futhermore, *known* functions can be *inlined*, removing function call overhead 
 (An on-demand version of C++'s compile time specialization.)
 ---
 
-![Cheap Trick!](./images/cheaptrick.png)
+![CheapTrick](./images/cheaptrick.png)
 
 ---
 ##  Haskell Type Classes
@@ -206,19 +206,22 @@ We represent a Haskell type class, e.g.
     (==) :: a -> a -> Bool
 ```
 
-as a *generic* F# interface:
+as a *generic* F# *interface* (same as a C#/.NET interface):
 ```fsharp
 type Eq<'A> = 
     abstract equal: 'A -> 'A -> bool 
 ```
 
-Trait F#
+
+*Trait F#* just adds a distinctive `Trait` attribute (in keeping with F#'s other attributes):
+
 ```fsharp
 [<Trait>]
 type Eq<'A> = 
     abstract equal: 'A -> 'A -> bool 
 ```
 
+(I'd prefer a new keyword, but never mind...)
 ---
 
 ## Haskell Overloads
@@ -241,7 +244,7 @@ The ordinary type parameter `'EqA` is:
 * bounded by its interface (`'EqA: Eq<'A>`);
 * a named *witness* for the constraint `Eq<'A>`.
 
-(think `equal`: `forall 'A, 'EqA <: Eq<'A>. 'A -> 'A -> bool`)
+(think `equal`: `forall 'A, 'EqA :> Eq<'A>. 'A -> 'A -> bool`)
 
 
 > *Haskell dictionary value ~ F# witness type*
