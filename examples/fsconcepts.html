@@ -757,9 +757,9 @@ This is the optimised code jitted at `NumInt:Num<int>`.
 00007FFD8BF85142  ret  
 ```
 
-Notice this is straight-up arithmetic code! Just 18 lines of masm (was 64 lines)
-
-*No* function calls/stack manipulation remain! *Way faster*.
++ Notice this is straight-up arithmetic code! Just 18 lines of masm (was 64 lines)
++ *No* function calls/stack manipulation remain! *Way faster* than debug code.
++ Quality almost as good as hand-specialized code (dictionary initialization remains but is dead)
 ---
 
 
