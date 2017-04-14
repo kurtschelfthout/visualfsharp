@@ -1309,7 +1309,7 @@ and SolveMemberConstraint (csenv:ConstraintSolverEnv) ignoreUnresolvedOverload p
                           let callerArgs = argtys |> List.map (fun argty -> CallerArg(argty,m,false,dummyExpr))
                           let minst = FreshenMethInfo g csenv.WitnessEnv m minfo
                           let objtys = minfo.GetObjArgTypes(amap, m, minst)
-                          Some(CalledMeth<Expr>(csenv.InfoReader,None,false,FreshenMethInfo g csenv.WitnessEnv,m,AccessibleFromEverywhere,minfo,minst,minst,None,objtys,[(callerArgs,[])],false,false,None))
+                          Some(CalledMeth<Expr>(csenv.InfoReader,None,false,FreshenMethInfo g csenv.WitnessEnv,m,AccessibleFromEverywhere,minfo,minst,minst,None,objtys,[(callerArgs,[])],false,false,None)))
 
               let methOverloadResult,errors = 
                   trace.CollectThenUndoOrCommit (fun (a, _) -> Option.isSome a) (fun trace -> ResolveOverloading csenv (WithTrace trace) nm ndeep (Some traitInfo) (0,0) AccessibleFromEverywhere calledMethGroup false (Some rty))
