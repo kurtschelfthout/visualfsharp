@@ -605,7 +605,7 @@ let mkPossibleTraitObjArgs (env: TcEnv) (cenv: cenv) m maybeTrait =
         let typar = NewInferenceTypar ()
         let nenv = env.NameEnv
         let wenv = MakeWitnessEnv cenv.g nenv
-        let csenv = (MakeConstraintSolverEnv cenv.css m wenv env.DisplayEnv)
+        let csenv = MakeConstraintSolverEnv ContextInfo.NoContext cenv.css m wenv env.DisplayEnv
         let tcenv =
             match wenv with
             | NoWitnessEnv -> None
@@ -739,7 +739,7 @@ let UnifyRefTupleType contextInfo cenv wenv denv m ty ps =
         | ContextInfo.RecordFields -> ContextInfo.TupleInRecordFields
         | _ -> contextInfo
 
-    AddCxTypeEqualsType contextInfo denv cenv.css m ty (TType_tuple (tupInfoRef, ptys))
+    AddCxTypeEqualsType wenv contextInfo denv cenv.css m ty (TType_tuple (tupInfoRef, ptys))
     ptys
 
 /// Optimized unification routine that avoids creating new inference 
@@ -751,7 +751,7 @@ let UnifyStructTupleType contextInfo cenv wenv denv m ty ps =
             if List.length ps = List.length ptys then ptys 
             else NewInferenceTypes ps
         else NewInferenceTypes ps
-    AddCxTypeEqualsType contextInfo wenv denv cenv.css m ty (TType_tuple (tupInfoStruct, ptys))
+    AddCxTypeEqualsType wenv contextInfo denv cenv.css m ty (TType_tuple (tupInfoStruct, ptys))
     ptys
 
 /// Optimized unification routine that avoids creating new inference 
@@ -2959,7 +2959,7 @@ let MakeApplicableExprWithFlex cenv (env: TcEnv) expr =
                 then actualType 
                 else 
                    let flexibleType = NewInferenceType ()
-                   AddCxTypeMustSubsumeType ContextInfo.NoContext (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv cenv.css m NoTrace actualType flexibleType;
+                   AddCxTypeMustSubsumeType (MakeWitnessEnv cenv.g env.NameEnv) ContextInfo.NoContext env.DisplayEnv cenv.css m NoTrace actualType flexibleType;
                    flexibleType)
 
         // Create a coercion to represent the expansion of the application
@@ -2980,9 +2980,9 @@ let TcRuntimeTypeTest isCast isOperator cenv wenv denv m tgty srcTy =
 
     if isSealedTy cenv.g tgty || isTyparTy cenv.g tgty || not (isInterfaceTy cenv.g srcTy) then 
         if isCast then
-            AddCxTypeMustSubsumeType (ContextInfo.RuntimeTypeTest isOperator) wenv denv cenv.css m NoTrace srcTy tgty
+            AddCxTypeMustSubsumeType wenv (ContextInfo.RuntimeTypeTest isOperator) denv cenv.css m NoTrace srcTy tgty
         else
-            AddCxTypeMustSubsumeType ContextInfo.NoContext wenv denv cenv.css m NoTrace srcTy tgty
+            AddCxTypeMustSubsumeType wenv ContextInfo.NoContext denv cenv.css m NoTrace srcTy tgty
 
     if isErasedType cenv.g tgty then
         if isCast then
@@ -3006,7 +3006,7 @@ let TcStaticUpcast cenv wenv denv m tgty srcTy =
     if typeEquiv cenv.g srcTy tgty then 
         warning(UpcastUnnecessary(m)) 
 
-    AddCxTypeMustSubsumeType ContextInfo.NoContext wenv denv cenv.css m NoTrace tgty srcTy
+    AddCxTypeMustSubsumeType wenv ContextInfo.NoContext denv cenv.css m NoTrace tgty srcTy
 
 
 let BuildPossiblyConditionalMethodCall cenv env isMutable m isProp minfo valUseFlags minst objArgs args =
@@ -3398,7 +3398,7 @@ let AnalyzeArbitraryExprAsEnumerable cenv (env: TcEnv) localAlloc m exprty expr 
 let ConvertArbitraryExprToEnumerable cenv ty (env: TcEnv) (expr:Expr) =
     let m = expr.Range
     let enumElemTy = NewInferenceType ()
-    if (AddCxTypeMustSubsumeTypeUndoIfFailed (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv cenv.css m ( mkSeqTy cenv.g enumElemTy) ty) then 
+    if AddCxTypeMustSubsumeTypeUndoIfFailed (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv cenv.css m ( mkSeqTy cenv.g enumElemTy) ty then 
         expr,enumElemTy
     else          
         let enumerableVar,enumerableExpr = mkCompGenLocal m "inputSequence" ty
@@ -3426,7 +3426,7 @@ let mkSeqCollect cenv env m enumElemTy genTy lam enumExpr =
     mkCallSeqCollect cenv.g m enumElemTy genResultTy lam enumExpr
 
 let mkSeqUsing cenv (env: TcEnv) m resourceTy genTy resourceExpr lam =
-    AddCxTypeMustSubsumeType ContextInfo.NoContext (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv cenv.css m NoTrace cenv.g.system_IDisposable_typ resourceTy
+    AddCxTypeMustSubsumeType (MakeWitnessEnv cenv.g env.NameEnv) ContextInfo.NoContext env.DisplayEnv cenv.css m NoTrace cenv.g.system_IDisposable_typ resourceTy
     let genResultTy = NewInferenceType ()
     UnifyTypes cenv env m genTy (mkSeqTy cenv.g genResultTy)
     mkCallSeqUsing cenv.g m resourceTy genResultTy resourceExpr lam 
@@ -4206,7 +4206,7 @@ let rec TcTyparConstraint ridx cenv newOk checkCxs occ (env: TcEnv) tpenv c =
         let tp',tpenv = TcTypar cenv env newOk tpenv tp
         if newOk = NoNewTypars && isSealedTy cenv.g ty' then 
             errorR(Error(FSComp.SR.tcInvalidConstraintTypeSealed(),m))
-        AddCxTypeMustSubsumeType ContextInfo.NoContext (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv cenv.css m NoTrace  ty' (mkTyparTy tp') 
+        AddCxTypeMustSubsumeType (MakeWitnessEnv cenv.g env.NameEnv) ContextInfo.NoContext env.DisplayEnv cenv.css m NoTrace  ty' (mkTyparTy tp') 
         tpenv
 
     | WhereTyparSupportsNull(tp,m) -> checkSimpleConstraint tp m AddCxTypeMustSupportNull
@@ -4605,7 +4605,7 @@ and TcTypeOrMeasure optKind cenv newOk checkCxs occ env (tpenv:SyntacticUnscoped
     | SynType.HashConstraint(ty,m) ->  
         let tp = TcAnonTypeOrMeasure (Some TyparKind.Type) cenv TyparRigidity.WarnIfNotRigid TyparDynamicReq.Yes newOk m
         let ty',tpenv = TcTypeAndRecover cenv newOk checkCxs occ env tpenv ty
-        AddCxTypeMustSubsumeType ContextInfo.NoContext (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv cenv.css m NoTrace  ty' (mkTyparTy tp) 
+        AddCxTypeMustSubsumeType (MakeWitnessEnv cenv.g env.NameEnv) ContextInfo.NoContext env.DisplayEnv cenv.css m NoTrace  ty' (mkTyparTy tp) 
         tp.AsType, tpenv
 
     | SynType.StaticConstant (c, m) ->
@@ -5042,7 +5042,7 @@ and TcSimplePats cenv optArgsOK  checkCxs ty env (tpenv,names,takenNames:Set<_>)
         [v],(tpenv,names,takenNames)
 
     | SynSimplePats.SimplePats (ps,m) -> 
-        let ptys = UnifyTupleType env.eContextInfo cenv (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv m ty ps
+        let ptys = UnifyRefTupleType env.eContextInfo cenv (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv m ty ps
         let ps',(tpenv,names,takenNames) = List.mapFold (fun tpenv (ty,e) -> TcSimplePat optArgsOK checkCxs cenv ty env tpenv e) (tpenv,names,takenNames) (List.zip ptys ps)
         ps',(tpenv,names,takenNames)
 
@@ -5481,7 +5481,7 @@ and TcExprOfUnknownType cenv env tpenv expr =
 and TcExprFlex cenv flex ty (env: TcEnv) tpenv (e: SynExpr) =
     if flex then
         let argty = NewInferenceType ()
-        AddCxTypeMustSubsumeType ContextInfo.NoContext (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv cenv.css e.Range NoTrace ty argty 
+        AddCxTypeMustSubsumeType (MakeWitnessEnv cenv.g env.NameEnv) ContextInfo.NoContext env.DisplayEnv cenv.css e.Range NoTrace ty argty 
         let e',tpenv  = TcExpr cenv argty env tpenv e 
         let e' = mkCoerceIfNeeded cenv.g ty argty e'
         e',tpenv
@@ -5857,7 +5857,7 @@ and TcExprUndelayed cenv overallTy env tpenv (expr: SynExpr) =
             UnifyTypes cenv env m overallTy genCollTy
             let exprty = NewInferenceType ()
             let genEnumTy =  mkSeqTy cenv.g genCollElemTy
-            AddCxTypeMustSubsumeType ContextInfo.NoContext (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv cenv.css m NoTrace genEnumTy exprty 
+            AddCxTypeMustSubsumeType (MakeWitnessEnv cenv.g env.NameEnv) ContextInfo.NoContext env.DisplayEnv cenv.css m NoTrace genEnumTy exprty 
             let expr,tpenv = TcExpr cenv exprty env tpenv comp
             let expr = mkCoerceIfNeeded cenv.g genEnumTy (tyOfExpr cenv.g expr) expr
             (if isArray then mkCallSeqToArray else mkCallSeqToList) cenv.g m genCollElemTy 
@@ -6422,7 +6422,7 @@ and FreshenObjExprAbstractSlot cenv (env: TcEnv) (implty:TType) virtNameAndArity
     | [(_,absSlot)] -> 
         
         let typarsFromAbsSlotAreRigid,typarsFromAbsSlot,argTysFromAbsSlot, retTyFromAbsSlot
-           = FreshenAbstractSlot cenv.g cenv.amap (MakeWitnessEnv cenv.g _env.NameEnv) mBinding synTyparDecls absSlot
+           = FreshenAbstractSlot cenv.g cenv.amap (MakeWitnessEnv cenv.g env.NameEnv) mBinding synTyparDecls absSlot
 
         // Work out the required type of the member 
         let bindingTy = implty --> (mkMethodTy cenv.g argTysFromAbsSlot retTyFromAbsSlot) 
@@ -6487,7 +6487,7 @@ and TcObjectExprBinding cenv (env: TcEnv) implty tpenv (absSlotInfo,bind) =
 
         let freeInEnv = GeneralizationHelpers.ComputeUngeneralizableTypars env
 
-        let generalizedTypars = GeneralizationHelpers.ComputeAndGeneralizeGenericTypars(cenv,env.NameEnv,denv,m,immut,freeInEnv,false,CanGeneralizeConstrainedTypars,inlineFlag,Some(rhsExpr),declaredTypars,[],bindingTy,false)
+        let generalizedTypars = GeneralizationHelpers.ComputeAndGeneralizeGenericTypars(cenv,env.NameEnv,denv,m,freeInEnv,false,CanGeneralizeConstrainedTypars,inlineFlag,Some(rhsExpr),declaredTypars,[],bindingTy,false)
         let declaredTypars = ChooseCanonicalDeclaredTyparsAfterInference cenv.g  env.DisplayEnv declaredTypars m
 
         let generalizedTypars = PlaceTyparsInDeclarationOrder declaredTypars generalizedTypars  
@@ -8199,7 +8199,7 @@ and TcSequenceExpression cenv env tpenv comp overallTy m =
 
                 if not isYield then errorR(Error(FSComp.SR.tcUseYieldBangForMultipleResults(),m)) 
 
-                AddCxTypeMustSubsumeType ContextInfo.NoContext (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv cenv.css m  NoTrace genOuterTy genExprTy
+                AddCxTypeMustSubsumeType (MakeWitnessEnv cenv.g env.NameEnv) ContextInfo.NoContext env.DisplayEnv cenv.css m  NoTrace genOuterTy genExprTy
                 Some(mkCoerceExpr(resultExpr,genOuterTy,m,genExprTy), tpenv)
 
             | SynExpr.YieldOrReturn((isYield,_),yieldExpr,m) -> 
@@ -8777,7 +8777,7 @@ and TcItemThen cenv overallTy env tpenv (item,mItem,rest,afterResolution) delaye
         let resultExpr, tpenv = TcDelayed cenv intermediateTy env tpenv mItem (MakeApplicableExprNoFlex cenv expr) (tyOfExpr cenv.g expr) ExprAtomicFlag.NonAtomic delayed1
 
         // Add the constraint after the application arguments have been checked to allow annotations to kick in on rigid type parameters
-        AddCxMethodConstraint env.DisplayEnv cenv.css mItem NoTrace traitInfo
+        AddCxMethodConstraint (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv cenv.css mItem NoTrace traitInfo
 
         // Process all remaining arguments after the constraint is asserted
         let resultExpr2, tpenv2 = TcDelayed cenv overallTy env tpenv mItem (MakeApplicableExprNoFlex cenv resultExpr) intermediateTy ExprAtomicFlag.NonAtomic delayed2
@@ -9058,7 +9058,7 @@ and TcLookupThen cenv overallTy env tpenv mObjExpr objExpr objExprTy longId dela
         RecdFieldInstanceChecks cenv.g cenv.amap ad mItem rfinfo
         let tgty = rfinfo.EnclosingType
         let valu = isStructTy cenv.g tgty
-        AddCxTypeMustSubsumeType ContextInfo.NoContext (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv cenv.css mItem NoTrace tgty objExprTy 
+        AddCxTypeMustSubsumeType (MakeWitnessEnv cenv.g env.NameEnv) ContextInfo.NoContext env.DisplayEnv cenv.css mItem NoTrace tgty objExprTy 
         let objExpr = if valu then objExpr else mkCoerceExpr(objExpr,tgty,mExprAndItem,objExprTy)
         let fieldTy = rfinfo.FieldType
         match delayed with 
@@ -9461,7 +9461,7 @@ and TcMethodApplication
                 | [calledMeth] -> 
                     UnifyMatchingSimpleArgumentTypes exprTy calledMeth
                 | _ -> 
-                    let domainTy,returnTy = UnifyFunctionType None cenv denv mMethExpr exprTy
+                    let domainTy,returnTy = UnifyFunctionType None cenv wenv denv mMethExpr exprTy
                     let argTys = if isUnitTy cenv.g domainTy then [] else  tryDestRefTupleTy cenv.g domainTy
                     // Only apply this rule if a candidate method exists with this number of arguments
                     let argTys = 
@@ -10592,7 +10592,7 @@ and TcAttribute canFail cenv (env: TcEnv) attrTgt (synAttr: SynAttribute)  =
                     let propNameItem = Item.SetterArg(id, setterItem)
                     CallNameResolutionSink cenv.tcSink (id.idRange,env.NameEnv,propNameItem,propNameItem,emptyTyparInst,ItemOccurence.Use,env.DisplayEnv,ad)
 
-                    AddCxTypeMustSubsumeType ContextInfo.NoContext (MakeWitnessEnv cenv.g env.NameEnv) env.DisplayEnv cenv.css m NoTrace argty argtyv
+                    AddCxTypeMustSubsumeType (MakeWitnessEnv cenv.g env.NameEnv) ContextInfo.NoContext env.DisplayEnv cenv.css m NoTrace argty argtyv
 
                     AttribNamedArg(nm,argty,isProp,mkAttribExpr expr))
 
@@ -10684,7 +10684,7 @@ and TcLetBinding cenv isUse env containerInfo declKind tpenv (binds,bindsm,scope
                    [] 
                 else 
                    let freeInEnv = lazyFreeInEnv.Force()
-                   GeneralizationHelpers.ComputeAndGeneralizeGenericTypars(cenv, env.NameEnv, denv, m, immut, freeInEnv, canInferTypars, GeneralizationHelpers.CanGeneralizeConstrainedTyparsForDecl(declKind), inlineFlag, Some rhsExpr, allDeclaredTypars, maxInferredTypars,tauTy,false)
+                   GeneralizationHelpers.ComputeAndGeneralizeGenericTypars(cenv, env.NameEnv, denv, m, freeInEnv, canInferTypars, GeneralizationHelpers.CanGeneralizeConstrainedTyparsForDecl(declKind), inlineFlag, Some rhsExpr, allDeclaredTypars, maxInferredTypars,tauTy,false)
 
             let prelimValSchemes2 = GeneralizeVals cenv denv enclosingDeclaredTypars  generalizedTypars nameToPrelimValSchemeMap
 
@@ -10746,7 +10746,7 @@ and TcLetBinding cenv isUse env containerInfo declKind tpenv (binds,bindsm,scope
         let mkCleanup (bodyExpr,bodyExprTy) =
             if isUse && not isFixed then 
                 (allValsDefinedByPattern,(bodyExpr,bodyExprTy)) ||> List.foldBack (fun v (bodyExpr,bodyExprTy) ->
-                    AddCxTypeMustSubsumeType ContextInfo.NoContext (MakeWitnessEnv cenv.g env.NameEnv) denv cenv.css v.Range NoTrace cenv.g.system_IDisposable_typ v.Type
+                    AddCxTypeMustSubsumeType (MakeWitnessEnv cenv.g env.NameEnv) ContextInfo.NoContext denv cenv.css v.Range NoTrace cenv.g.system_IDisposable_typ v.Type
                     let cleanupE = BuildDisposableCleanup cenv env m v
                     mkTryFinally cenv.g (bodyExpr,cleanupE,m,bodyExprTy,SequencePointInBodyOfTry,NoSequencePointAtFinally),bodyExprTy)
             else 
@@ -11545,7 +11545,7 @@ and TcLetrecComputeAndGeneralizeGenericTyparsForBinding cenv env denv freeInEnv 
     let maxInferredTypars = freeInTypeLeftToRight cenv.g false tau
 
     let canGeneralizeConstrained = GeneralizationHelpers.CanGeneralizeConstrainedTyparsForDecl rbinfo.DeclKind
-    let generalizedTypars = GeneralizationHelpers.ComputeAndGeneralizeGenericTypars (cenv,env.NameEnv,denv,m,immut,freeInEnv,canInferTypars,canGeneralizeConstrained,inlineFlag, Some(expr), allDeclaredTypars, maxInferredTypars,tau,isCtor)
+    let generalizedTypars = GeneralizationHelpers.ComputeAndGeneralizeGenericTypars (cenv,env.NameEnv,denv,m,freeInEnv,canInferTypars,canGeneralizeConstrained,inlineFlag, Some(expr), allDeclaredTypars, maxInferredTypars,tau,isCtor)
     generalizedTypars
 
 /// Compute the type variables which may have member constraints that need to be canonicalized prior to generalization 
@@ -11787,7 +11787,7 @@ let TcAndPublishValSpec (cenv, env, containerInfo: ContainerInfo, declKind, memF
 
             let flex = ExplicitTyparInfo(declaredTypars,declaredTypars,synCanInferTypars)
             
-            let generalizedTypars = GeneralizationHelpers.ComputeAndGeneralizeGenericTypars(cenv,env.NameEnv, denv,id.idRange,canInferTypars,emptyFreeTypars,canInferTypars,CanGeneralizeConstrainedTypars,inlineFlag,None,allDeclaredTypars,freeInType,ty,false)
+            let generalizedTypars = GeneralizationHelpers.ComputeAndGeneralizeGenericTypars(cenv,env.NameEnv, denv,id.idRange,emptyFreeTypars,canInferTypars,CanGeneralizeConstrainedTypars,inlineFlag,None,allDeclaredTypars,freeInType,ty,false)
             
             let valscheme1 = PrelimValScheme1(id,flex,ty,Some(partialValReprInfo),memberInfoOpt,mutableFlag,inlineFlag,NormalVal,noArgOrRetAttribs,vis,false)
 
@@ -14379,7 +14379,7 @@ module EstablishTypeDefinitionCores =
             elif hasStructAttr then TyconStruct
             elif hasTraitAttr then TyconInterface
             elif hasWitnessAttr then TyconStruct
-            elif isConcrete || nonNil fields then TyconClass
+            elif isConcrete || not (isNil fields) then TyconClass
             elif isNil slotsigs && inSig  then TyconHiddenRepr
             else TyconInterface
         | k -> 
@@ -16986,7 +16986,7 @@ let TypeCheckOneImplFile
 
  eventually {  
     let envinner, mtypeAcc = MakeInitialEnv env 
-    let cenv = cenv.Create (g, isScript, niceNameGen, amap, topCcu, false, Option.isSome rootSigOpt, conditionalDefines, tcSink, (LightweightTcValForUsingInBuildMethodCall g (MakeWitnessEnv g envinner.NameEnv)))  
+    let cenv = cenv.Create (g, isScript, niceNameGen, amap, topCcu, false, Option.isSome rootSigOpt, conditionalDefines, tcSink, (LightweightTcValForUsingInBuildMethodCall g (MakeWitnessEnv g envinner.NameEnv)))
 
     let defs = [ for x in implFileFrags -> SynModuleDecl.NamespaceFragment(x) ]
     let! mexpr, topAttrs, envAtEnd = TcModuleOrNamespaceElements cenv ParentNone qualNameOfFile.Range envinner PreXmlDocEmpty None defs

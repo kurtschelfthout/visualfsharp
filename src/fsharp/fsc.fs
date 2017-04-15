@@ -1933,7 +1933,7 @@ let main2a(Args (ctok, tcConfig, tcImports, frameworkTcImports: TcImports, tcGlo
         match tcConfig.metadataVersion with
         | Some(v) -> v
         | _ -> match (frameworkTcImports.DllTable.TryFind tcConfig.primaryAssembly.Name) with | Some(ib) -> ib.RawMetadata.TryGetRawILModule().Value.MetadataVersion | _ -> ""
-    let optimizedImpls, optimizationData, _ = ApplyAllOptimizations (tcConfig, tcGlobals, (LightweightTcValForUsingInBuildMethodCall tcGlobals NameResolution.NoWitnessEnv), outfile, importMap, false, optEnv0, generatedCcu, typedAssembly)
+    let optimizedImpls, optimizationData, _ = ApplyAllOptimizations (tcConfig, tcGlobals, (LightweightTcValForUsingInBuildMethodCall tcGlobals NameResolution.NoWitnessEnv), outfile, importMap, false, optEnv0, generatedCcu, typedImplFiles)
 
     AbortOnError(errorLogger, exiter)
         

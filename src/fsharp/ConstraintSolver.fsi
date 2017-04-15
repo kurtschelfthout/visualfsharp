@@ -140,6 +140,6 @@ val AddCxTypeIsDelegate                       : WitnessEnv -> DisplayEnv -> Cons
 
 val CodegenWitnessThatTypSupportsTraitConstraint : TcValF -> TcGlobals -> ImportMap -> range -> WitnessEnv -> TraitConstraintInfo -> Expr list -> OperationResult<Expr option>
 
-val ChooseTyparSolutionAndSolve : ConstraintSolverState -> TypeRelations.WitnessEnv -> DisplayEnv -> Typar -> unit
+val ChooseTyparSolutionAndSolve : ConstraintSolverState -> WitnessEnv -> DisplayEnv -> Typar -> unit
 
 val IsApplicableMethApprox : TcGlobals -> ImportMap -> range -> WitnessEnv -> MethInfo -> TType -> bool

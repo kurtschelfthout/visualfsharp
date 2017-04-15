@@ -760,7 +760,7 @@ and solveTypMeetsTyparConstraints (csenv:ConstraintSolverEnv) ndeep m2 trace ty 
       | TyparConstraint.IsReferenceType m2            -> SolveTypIsReferenceType            csenv ndeep m2 trace ty
       | TyparConstraint.RequiresDefaultConstructor m2 -> SolveTypRequiresDefaultConstructor csenv ndeep m2 trace ty
       | TyparConstraint.SimpleChoice(tys,m2)          -> SolveTypChoice                     csenv ndeep m2 trace ty tys
-      | TyparConstraint.CoercesTo(ty2,m2,_)        -> SolveTypSubsumesTypKeepAbbrevs     csenv ndeep m2 trace ty2 ty
+      | TyparConstraint.CoercesTo(ty2,m2,_)        -> SolveTypSubsumesTypKeepAbbrevs     csenv ndeep m2 trace None ty2 ty
       | TyparConstraint.Associated(ty2,m2)            -> SolveTypAssociated                 csenv ndeep m2 trace ty ty2
       | TyparConstraint.MayResolveMember(traitInfo,m2) -> 
           SolveMemberConstraint csenv false false ndeep m2 trace traitInfo ++ (fun _ -> CompleteD) 
@@ -952,21 +952,21 @@ and SolveTyparSubtypeOfType (csenv:ConstraintSolverEnv) ndeep m2 trace tp ty1 =
             | WitnessEnv(nenv,instantiationGenerator) ->
                 Some (nenv.eTyconsByDemangledNameAndArity.Values
                       |> Seq.choose (fun witnessTyconRef -> 
-                              if TyconRefHasAttribute g m g.attrib_WitnessAttribute witnessTyconRef &&
+                              if TyconRefHasAttribute g m2 g.attrib_WitnessAttribute witnessTyconRef &&
                                   witnessTyconRef.IsStructOrEnumTycon then Some witnessTyconRef
                               else None)
                       |> Seq.toList, instantiationGenerator)
-        (if isAppTy g ty1 &&  TyconRefHasTraitAttribute g m (tcrefOfAppTy g ty1) then 
+        (if isAppTy g ty1 &&  TyconRefHasTraitAttribute g m2 (tcrefOfAppTy g ty1) then 
              // For U :> MergeTrait<T>, record the fact that solving T implies solving U,
              // hence generalizing T implied generalizing U
              let ftvs = (freeInType CollectTyparsNoCachingNoConstraints ty1).FreeTypars |> Seq.toList             
-             (ftvs |> IterateD (fun ftv -> AddConstraint csenv ndeep m2 trace ftv  (TyparConstraint.Associated(mkTyparTy tp,m))))
+             (ftvs |> IterateD (fun ftv -> AddConstraint csenv ndeep m2 trace ftv  (TyparConstraint.Associated(mkTyparTy tp,m2))))
              ++ (// A trait subclass implies a struct constraint, because
                  // all [<Witness>]es are by default structs.
-                 fun () -> AddConstraint csenv ndeep m2 trace tp (TyparConstraint.IsNonNullableStruct m))
+                 fun () -> AddConstraint csenv ndeep m2 trace tp (TyparConstraint.IsNonNullableStruct m2))
          else
              CompleteD
-        ) ++ (fun () -> AddConstraint csenv ndeep m2 trace tp (TyparConstraint.CoercesTo(ty1,m,tcenv)))
+        ) ++ (fun () -> AddConstraint csenv ndeep m2 trace tp (TyparConstraint.CoercesTo(ty1,m2,tcenv)))
 
 and DepthCheck ndeep m = 
   if ndeep > 300 then error(Error(FSComp.SR.csTypeInferenceMaxDepth(),m)) else CompleteD
@@ -2575,7 +2575,7 @@ let EliminateConstraintsForGeneralizedTypars csenv (trace:OptionalTrace) (genera
 //------------------------------------------------------------------------- 
 
 let AddCxTypeEqualsType wenv contextInfo denv css m ty1 ty2 = 
-    SolveTypEqualsTypWithReport (MakeConstraintSolverEnv contextInfo css m wenv denv) 0 m NoTrace ty1 ty2
+    SolveTypEqualsTypWithReport (MakeConstraintSolverEnv contextInfo css m wenv denv) 0 m NoTrace None ty1 ty2
     |> RaiseOperationResult
 
 let UndoIfFailed f =
@@ -2604,7 +2604,7 @@ let AddCxTypeEqualsTypeMatchingOnlyUndoIfFailed wenv denv css m ty1 ty2 =
 
 let AddCxTypeMustSubsumeTypeUndoIfFailed wenv denv css m ty1 ty2 = 
     let csenv = MakeConstraintSolverEnv ContextInfo.NoContext css m wenv denv
-    UndoIfFailed (fun trace -> SolveTypSubsumesTypKeepAbbrevs csenv 0 m (WithTrace(trace)) ty1 ty2)
+    UndoIfFailed (fun trace -> SolveTypSubsumesTypKeepAbbrevs csenv 0 m (WithTrace(trace)) None ty1 ty2)
 
 let AddCxTypeMustSubsumeTypeMatchingOnlyUndoIfFailed wenv denv css m ty1 ty2 = 
     let csenv = MakeConstraintSolverEnv ContextInfo.NoContext css m wenv denv
@@ -2621,7 +2621,7 @@ let AddCxMethodConstraint wenv denv css m trace traitInfo  =
     |> RaiseOperationResult
 
 let AddCxTypeMustSupportNull wenv denv css m trace ty =
-    TryD (fun () -> SolveTypSupportsNull (MakeConstraintSolverEnv ContextInfo.NoContext css m denv) 0 m trace ty)
+    TryD (fun () -> SolveTypSupportsNull (MakeConstraintSolverEnv ContextInfo.NoContext css m wenv denv) 0 m trace ty)
          (fun res -> ErrorD (ErrorFromAddingConstraint(denv,res,m)))
     |> RaiseOperationResult
 
@@ -2665,7 +2665,7 @@ let AddCxTypeIsDelegate wenv denv css m trace ty aty bty =
          (fun res -> ErrorD (ErrorFromAddingConstraint(denv,res,m)))
     |> RaiseOperationResult
 
-let CodegenWitnessThatTypSupportsTraitConstraint tcVal g amap m (traitInfo:TraitConstraintInfo) argExprs = 
+let CodegenWitnessThatTypSupportsTraitConstraint tcVal g amap m wenv (traitInfo:TraitConstraintInfo) argExprs = 
     let css = 
         { g = g
           amap = amap
@@ -2760,7 +2760,7 @@ let CodegenWitnessThatTypSupportsTraitConstraint tcVal g amap m (traitInfo:Trait
 let ChooseTyparSolutionAndSolve css wenv denv tp =
     let g = css.g
     let amap = css.amap
-    let max,m = ChooseTyparSolutionAndRange g amap nenv tp 
+    let max,m = ChooseTyparSolutionAndRange g amap tp 
     let csenv = MakeConstraintSolverEnv ContextInfo.NoContext css m wenv denv
     TryD (fun () -> SolveTyparEqualsTyp csenv 0 m NoTrace (mkTyparTy tp) max)
           (fun err -> ErrorD(ErrorFromApplyingDefault(g,denv,tp,max,err,m)))
@@ -2770,7 +2770,7 @@ let ChooseTyparSolutionAndSolve css wenv denv tp =
 let CheckDeclaredTypars wenv denv css m typars1 typars2 = 
     TryD (fun () -> 
             CollectThenUndo (fun trace -> 
-               SolveTypEqualsTypEqns (MakeConstraintSolverEnv ContextInfo.NoContext css m wenv denv) 0 m (WithTrace(trace)) 
+               SolveTypEqualsTypEqns (MakeConstraintSolverEnv ContextInfo.NoContext css m wenv denv) 0 m (WithTrace(trace)) None
                    (List.map mkTyparTy typars1) 
                    (List.map mkTyparTy typars2)))
          (fun res -> ErrorD (ErrorFromAddingConstraint(denv,res,m)))

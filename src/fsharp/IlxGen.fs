@@ -3373,7 +3373,7 @@ and GenDefaultValue cenv cgbuf eenv (ty,m) =
 //-------------------------------------------------------------------------- 
 
 and GenGenericParam cenv eenv (tp:Typar) = 
-    let subTypeConstraints             = tp.Constraints |> List.choose (function | TyparConstraint.CoercesTo(ty,_,_) -> Some(ty) | _ -> None) |> List.map (GenTypeAux cenv.amap tp.Range cenv.g eenv.tyenv VoidNotOK PtrTypesNotOK)
+    let subTypeConstraints             = tp.Constraints |> List.choose (function | TyparConstraint.CoercesTo(ty,_,_) -> Some(ty) | _ -> None) |> List.map (GenTypeAux cenv.amap tp.Range eenv.tyenv VoidNotOK PtrTypesNotOK)
     let refTypeConstraint              = tp.Constraints |> List.exists (function TyparConstraint.IsReferenceType _ -> true | TyparConstraint.SupportsNull _ -> true | _ -> false)
     let notNullableValueTypeConstraint = tp.Constraints |> List.exists (function TyparConstraint.IsNonNullableStruct _ -> true | _ -> false)
     let defaultConstructorConstraint   = tp.Constraints |> List.exists (function TyparConstraint.RequiresDefaultConstructor _ -> true | _ -> false)
