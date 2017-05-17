@@ -1918,7 +1918,7 @@ let FreshenPossibleForallTy g wenv m rigid ty =
     else
         // tps may be have been equated to other tps in equi-recursive type inference and units-of-measure type inference. Normalize them here 
         let tpsorig = NormalizeDeclaredTyparsForEquiRecursiveInference g tpsorig
-        let tps,renaming,tinst = CopyAndFixupTypars m wenv rigid tpsorig
+        let tps,renaming,tinst = CopyAndFixupTypars g wenv m rigid tpsorig
         tpsorig,tps,tinst,instType renaming tau
 
 let infoOfTyconRef g wenv m (tcref:TyconRef) = 
@@ -1950,7 +1950,7 @@ let FreshenAbstractSlot g amap wenv m synTyparDecls absMethInfo =
         let ttps = absMethInfo.GetFormalTyparsOfDeclaringType m 
         let ttinst = argsOfAppTy g absMethInfo.EnclosingType
         let rigid = if typarsFromAbsSlotAreRigid then TyparRigidity.Rigid else TyparRigidity.Flexible
-        ConstraintSolver.FreshenAndFixupTypars g m rigid ttps ttinst fmtps
+        ConstraintSolver.FreshenAndFixupTypars g wenv m rigid ttps ttinst fmtps
 
     // Work out the required type of the member 
     let argTysFromAbsSlot = argtys |> List.mapSquared (instType typarInstFromAbsSlot) 
@@ -2819,7 +2819,7 @@ let TcVal checkAttributes cenv env tpenv (vref:ValRef) optInst optAfterResolutio
                                 tpsorig,vrefFlags,tinst,tau2,tpenv  
                             | ValInRecScope true 
                             | ValNotInRecScope ->
-                                let tpsorig,tps,tptys,tau = FreshenPossibleForallTy cenv.g m TyparRigidity.Flexible vty 
+                                let tpsorig,tps,tptys,tau = FreshenPossibleForallTy cenv.g (MakeWitnessEnv cenv.g env.NameEnv) m TyparRigidity.Flexible vty 
                                 //dprintfn "After Freshen: tau = %s" (Layout.showL (typeL tau))
                                 let (tinst:TypeInst),tpenv = checkTys tpenv (tps |> List.map (fun tp -> tp.Kind))
                                 checkInst tinst
@@ -9408,8 +9408,6 @@ and TcMethodApplication
 
         let callerArgCounts = (List.sumBy List.length unnamedCurriedCallerArgs, List.sumBy List.length namedCurriedCallerArgs)
 
-        let callerArgs = List.zip unnamedCurriedCallerArgs namedCurriedCallerArgs
-
         let makeOneCalledMeth (minfo,pinfoOpt,usesParamArrayConversion) = 
             let minst = FreshenMethInfo cenv.g wenv mItem minfo
             let callerTyArgs = 
@@ -9507,8 +9505,6 @@ and TcMethodApplication
     // STEP 3. Resolve overloading 
     /// Select the called method that's the result of overload resolution
     let finalCalledMeth = 
-
-        let callerArgs = List.zip unnamedCurriedCallerArgs namedCurriedCallerArgs
 
         let postArgumentTypeCheckingCalledMethGroup = 
             preArgumentTypeCheckingCalledMethGroup |> List.map (fun (minfo:MethInfo,minst,pinfoOpt,usesParamArrayConversion) ->
